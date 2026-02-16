@@ -1,4 +1,4 @@
-import { Organism, SimulationState, ScienceLab } from "./types";
+import { Organism, SimulationState, ScienceLab, LabSnapshot } from "./types";
 
 export class Simulation {
   private state: SimulationState;
@@ -353,7 +353,7 @@ export class Simulation {
     };
   }
 
-  getLabSnapshot(): any {
+  getLabSnapshot(): LabSnapshot {
     return {
       environment: this.state.environment,
       parameters: {

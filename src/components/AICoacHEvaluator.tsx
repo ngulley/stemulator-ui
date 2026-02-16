@@ -35,6 +35,7 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
     if (studentResponses) {
       evaluateResponses();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentResponses]);
 
   const evaluateResponses = async () => {
