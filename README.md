@@ -81,8 +81,8 @@ The frontend works **standalone** with built-in mock data. No backend needed.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/STEMulator.git
-cd STEMulator
+git clone https://github.com/ngulley/stemulator-ui.git
+cd stemulator-ui
 
 # 2. Install dependencies
 npm install
