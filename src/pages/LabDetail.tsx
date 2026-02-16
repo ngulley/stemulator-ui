@@ -16,7 +16,7 @@ import AIPanel from "../components/AIPanel";
 import LabContentPanel from "../components/LabContentPanel";
 import AICoacHEvaluator from "../components/AICoacHEvaluator";
 import { Simulation } from "../simulation";
-import { SimulationState, LabSnapshot, ScienceLab } from "../types";
+import { SimulationState, ScienceLab } from "../types";
 import { mockLabs } from "../data";
 import { getLab } from "../services/api";
 
@@ -99,10 +99,6 @@ const LabDetail: React.FC = () => {
       sim.applyScienceLab(lab, lab.labParts[currentPartIdx].partId);
       setState(sim.getState());
     }
-  };
-
-  const handleSendSnapshot = (snapshot: LabSnapshot) => {
-    console.log("Sending snapshot:", snapshot);
   };
 
   const handleObservationsSubmit = (responses: Record<string, string>) => {
@@ -342,8 +338,11 @@ const LabDetail: React.FC = () => {
                   />
                 ) : (
                   <AIPanel
-                    onSendSnapshot={handleSendSnapshot}
-                    snapshot={sim.getLabSnapshot()}
+                    simState={state}
+                    labTitle={lab.title}
+                    discipline={lab.discipline}
+                    topic={lab.topic}
+                    subTopic={lab.subTopic}
                   />
                 )}
               </div>

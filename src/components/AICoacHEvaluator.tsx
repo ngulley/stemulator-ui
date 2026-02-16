@@ -5,9 +5,15 @@ import {
   AlertCircle,
   Lightbulb,
   ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { LabPart, ScienceLab } from "../types";
 import { getGuidance, ScienceGuideRequest } from "../services/api";
+import {
+  evaluateStudentWork,
+  isOpenAIConfigured,
+  EvalResult,
+} from "../services/openai";
 
 interface AICoacHEvaluatorProps {
   lab: ScienceLab;
@@ -20,9 +26,10 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
   part,
   studentResponses,
 }) => {
-  const [evaluation, setEvaluation] = useState<any>(null);
+  const [evaluation, setEvaluation] = useState<EvalResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiGuidance, setApiGuidance] = useState<string | null>(null);
+  const [aiPowered, setAiPowered] = useState(false);
 
   useEffect(() => {
     if (studentResponses) {
@@ -32,8 +39,9 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
 
   const evaluateResponses = async () => {
     setLoading(true);
+    setAiPowered(false);
 
-    // Try to get guidance from backend API
+    // 1️⃣ Try backend guidance API first
     try {
       const request: ScienceGuideRequest = {
         studentName: "Student",
@@ -48,19 +56,44 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
         setApiGuidance(response.guidance);
       }
     } catch (err) {
-      console.warn(
-        "Backend AI guidance unavailable, using local evaluation:",
-        err,
-      );
+      console.warn("Backend AI guidance unavailable:", err);
       setApiGuidance(null);
     }
 
-    const feedback = generateFeedback();
+    // 2️⃣ Try OpenAI for structured evaluation
+    if (isOpenAIConfigured() && studentResponses) {
+      try {
+        const result = await evaluateStudentWork({
+          labTitle: lab.title,
+          discipline: lab.discipline,
+          topic: lab.topic,
+          subTopic: lab.subTopic,
+          partTitle: part.title,
+          setup: part.setup,
+          observations: part.observations,
+          evidence: part.evidence || [],
+          predictions: part.predictions,
+          studentResponses,
+        });
+        setEvaluation(result);
+        setAiPowered(true);
+        setLoading(false);
+        return;
+      } catch (err) {
+        console.warn(
+          "OpenAI evaluation unavailable, using local fallback:",
+          err,
+        );
+      }
+    }
+
+    // 3️⃣ Fallback to local heuristics
+    const feedback = generateLocalFeedback();
     setEvaluation(feedback);
     setLoading(false);
   };
 
-  const generateFeedback = () => {
+  const generateLocalFeedback = (): EvalResult | null => {
     if (!studentResponses) return null;
 
     const responses = Object.values(studentResponses);
@@ -146,11 +179,18 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
           <Brain className="w-6 h-6 text-purple-600" />
         </div>
         <div>
-          <h3 className="font-bold text-lg text-slate-900">
+          <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
             AI Coach Evaluation
+            {aiPowered && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                <Sparkles className="w-3 h-3" /> GPT
+              </span>
+            )}
           </h3>
           <p className="text-sm text-slate-600">
-            Analyzing your observations...
+            {aiPowered
+              ? "Powered by OpenAI — personalized feedback"
+              : "Analyzing your observations..."}
           </p>
         </div>
       </div>

@@ -33,7 +33,7 @@ An AI-guided virtual STEM lab platform with interactive courses and real-time Na
 | 🐇 **Natural Selection Simulator** | Canvas-based rabbit/wolf simulation with real-time trait evolution       |
 | 🎮 **Lab Controls**                | Visual habitat, predation, food supply, and mutation rate selectors      |
 | 📊 **Analysis Dashboard**          | Population charts, trait distribution graphs, and AI-generated insights  |
-| 🤖 **AI Coach**                    | Submit observations and receive feedback (requires backend + OpenAI key) |
+| 🤖 **AI Science Coach**            | GPT-4o-mini powered chat + structured evaluation of student observations |
 | 📝 **Student Workflow**            | 4-step process: Setup → Observe → Evidence → Predict                     |
 | 🎨 **Canvas Rendering**            | Animated rabbits and wolves with environment-adaptive fur colors         |
 | 📱 **Responsive Design**           | Clean Tailwind CSS design system                                         |
@@ -161,18 +161,18 @@ Open [http://localhost:5173](http://localhost:5173) — navigate to **Labs** and
 │  Vite Dev Server │          │  /stemulator  │          │  labs     │
 │  Tailwind CSS    │          │  /v1/labs     │          │  collection│
 │  React Router    │          │  /v1/guides   │          │           │
-└──────────────────┘          └───────────────┘          └───────────┘
-        │                            │
-        │                            ▼
-        │                     ┌──────────────┐
-        │                     │  OpenAI API  │
-        │                     │  (optional)  │
-        │                     │  AI Guidance │
-        │                     └──────────────┘
-        ▼
-  Falls back to mock
-  data if backend is
-  unavailable
+└────────┬─────────┘          └───────────────┘          └───────────┘
+         │
+         │  VITE_OPENAI_API_KEY
+         ▼
+  ┌──────────────┐
+  │  OpenAI API  │  ← AI Science Coach (chat + evaluation)
+  │  gpt-4o-mini │  ← Called directly from frontend
+  └──────────────┘
+         │
+  Falls back to:
+  • Backend /guides endpoint (if available)
+  • Local heuristic evaluation (always available)
 ```
 
 ---
@@ -200,7 +200,8 @@ STEMulator/
 │   ├── simulation.ts           # Simulation engine (population dynamics, survival, reproduction)
 │   │
 │   ├── services/
-│   │   └── api.ts              # Backend API service (getLabs, getLab, getGuidance, createLab)
+│   │   ├── api.ts              # Backend API service (getLabs, getLab, getGuidance, createLab)
+│   │   └── openai.ts           # OpenAI integration (chatWithCoach, evaluateStudentWork)
 │   │
 │   ├── components/
 │   │   ├── Navbar.tsx          # Top navigation bar
@@ -209,8 +210,8 @@ STEMulator/
 │   │   ├── Controls.tsx        # Lab controls — habitat, wolves, food, mutation rate
 │   │   ├── Results.tsx         # Analysis dashboard — population chart, trait bars, insights
 │   │   ├── LabContentPanel.tsx # Lab workflow panel — setup, observations, evidence, predictions
-│   │   ├── AIPanel.tsx         # AI snapshot panel
-│   │   ├── AICoacHEvaluator.tsx# AI Coach — evaluates student responses
+│   │   ├── AIPanel.tsx         # AI Science Coach chat (OpenAI-powered Q&A)
+│   │   ├── AICoacHEvaluator.tsx# AI Coach evaluator (OpenAI → backend → local fallback)
 │   │   ├── LabSidebar.tsx      # Lab info sidebar
 │   │   ├── LabWorkflow.tsx     # Lab workflow component
 │   │   └── StudentResponses.tsx# Student response forms
@@ -357,13 +358,39 @@ Copy `.env.example` to `.env` and configure as needed:
 cp .env.example .env
 ```
 
-| Variable       | Default                | Description                                                                                 |
-| -------------- | ---------------------- | ------------------------------------------------------------------------------------------- |
-| `VITE_API_URL` | _(empty — uses proxy)_ | Backend API URL. Leave blank for local dev with Vite proxy. Set to full URL for production. |
+| Variable              | Default                | Description                                                                                                               |
+| --------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_API_URL`        | _(empty — uses proxy)_ | Backend API URL. Leave blank for local dev with Vite proxy. Set to full URL for production.                               |
+| `VITE_OPENAI_API_KEY` | _(empty)_              | OpenAI API key for the AI Science Coach. Get one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys). |
 
 **Local development:** Leave `VITE_API_URL` empty. The Vite proxy in `vite.config.ts` forwards `/stemulator/*` requests to `localhost:8080`.
 
 **Production:** Set `VITE_API_URL=https://your-api-server.com/stemulator/v1`.
+
+### AI Science Coach Setup
+
+The AI Coach uses **GPT-4o-mini** via the OpenAI API. To enable it:
+
+```bash
+# 1. Get an API key from https://platform.openai.com/api-keys
+# 2. Add it to your .env file
+echo 'VITE_OPENAI_API_KEY=sk-your-key-here' >> .env
+
+# 3. Restart the dev server (Vite picks up .env changes on restart)
+npm run dev
+```
+
+**Without the key:** The AI Feedback tab shows a "not configured" notice, and the student evaluator falls back to local heuristic scoring.
+
+**With the key:** Students can:
+
+- Chat with the AI Coach about their simulation in real time
+- Use quick actions: "Explain what's happening", "Why did this happen?", "What should I try next?"
+- Receive GPT-powered evaluation of their lab observations with scores, strengths, and guidance
+
+**Cost:** GPT-4o-mini is very affordable (~$0.15 per 1M input tokens). A typical student session uses a few cents.
+
+> ⚠️ **Security note:** The API key is stored in `.env` (gitignored) and exposed to the browser via `VITE_` prefix. For production, consider proxying OpenAI calls through your backend instead.
 
 ---
 
@@ -416,6 +443,13 @@ This was a known issue caused by the backend using `labId` while the frontend ex
 curl -s http://localhost:8080/stemulator/v1/labs | python3 -m json.tool | head -20
 # Look for "labId" vs "_id" in the response
 ```
+
+### AI Coach shows "Not Configured"
+
+1. Make sure `VITE_OPENAI_API_KEY` is set in your `.env` file (not `.env.example`)
+2. The key must start with `sk-` to be recognized
+3. Restart the dev server after editing `.env` — Vite doesn't hot-reload env changes
+4. Check the browser console for OpenAI API errors (401 = invalid key, 429 = rate limit)
 
 ### Canvas is blank
 
