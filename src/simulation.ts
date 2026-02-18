@@ -173,19 +173,19 @@ export class Simulation {
 
   private survive() {
     // --- Predation pressure on prey ---
-    // Higher predation → more prey die, but traits help
-    const predationPressure = { low: 0.08, medium: 0.18, high: 0.3 }[
+    const predationPressure = { low: 0.05, medium: 0.18, high: 0.35 }[
       this.state.predation
     ];
-    // Food scarcity penalty
-    const foodPenalty = { low: 0.15, medium: 0.05, high: 0.0 }[
+    // Food scarcity penalty — scarce food is devastating
+    const foodPenalty = { low: 0.2, medium: 0.05, high: 0.0 }[
       this.state.foodAvailability
     ];
-    // Environment-specific trait bonuses
+    // Environment-specific trait bonuses (smaller — traits help at the margin,
+    // they don't override resource scarcity or overwhelming predation)
     const envBonus = {
-      forest: { speed: 0, camouflage: 3, size: 0 },
-      desert: { speed: 2, camouflage: 0, size: -1 },
-      arctic: { speed: 0, camouflage: 1, size: 2 },
+      forest: { speed: 0, camouflage: 2, size: 0 },
+      desert: { speed: 1, camouflage: 0, size: -1 },
+      arctic: { speed: 0, camouflage: 1, size: 1 },
     }[this.state.environment];
 
     const prey = this.state.organisms.filter(
@@ -195,25 +195,30 @@ export class Simulation {
       (o) => o.alive && o.role === "predator",
     );
 
+    // Scale predation by actual predator-to-prey ratio so adding more
+    // wolves has a tangible effect beyond the categorical "high" setting.
+    const predatorRatio = prey.length > 0 ? predators.length / prey.length : 0;
+    const densityMultiplier = Math.min(1.6, 1.0 + predatorRatio * 2);
+
     // ── Prey survival ──
     prey.forEach((org) => {
-      // Base survival is high (rabbits are good at surviving when unmolested)
-      let survivalProb = 0.75;
+      // Base survival — without any pressures, rabbits survive easily
+      let survivalProb = 0.8;
 
-      // Traits help: each trait (0-10) mapped into a bonus
+      // Trait bonuses (each trait 0-10 mapped to a small bonus)
       const effectiveSpeed = org.speed + envBonus.speed;
       const effectiveCamo = org.camouflage + envBonus.camouflage;
       const effectiveSize = org.size + envBonus.size;
 
-      survivalProb += effectiveSpeed * 0.015; // fast → harder to catch
-      survivalProb += effectiveCamo * 0.02; // camo → harder to find
-      survivalProb += effectiveSize * 0.008; // bigger → slightly tougher
+      survivalProb += effectiveSpeed * 0.01; // fast → harder to catch
+      survivalProb += effectiveCamo * 0.012; // camo → harder to find
+      survivalProb += effectiveSize * 0.005; // bigger → slightly tougher
 
-      // Penalties
-      survivalProb -= predationPressure; // wolves eat rabbits
-      survivalProb -= foodPenalty; // starvation
+      // Environmental pressures
+      survivalProb -= predationPressure * densityMultiplier;
+      survivalProb -= foodPenalty;
 
-      survivalProb = Math.max(0.05, Math.min(0.95, survivalProb));
+      survivalProb = Math.max(0.08, Math.min(0.95, survivalProb));
       org.alive = Math.random() < survivalProb;
     });
 
@@ -247,20 +252,38 @@ export class Simulation {
       Math.max(0, Math.min(10, val + (Math.random() - 0.5) * mutation * 3));
 
     // ── Prey reproduction ──
-    // Rabbits breed quickly — each survivor can produce 1-3 offspring
-    // But cap total population to avoid runaway growth
+    // Offspring rate depends on food availability and population density.
+    // Scarce food → fewer offspring.  Abundant food → more offspring.
+    const foodMultiplier = { low: 0.4, medium: 0.7, high: 1.0 }[
+      this.state.foodAvailability
+    ];
+    // High predation stress reduces breeding success
+    const predStress = { low: 1.0, medium: 0.85, high: 0.65 }[
+      this.state.predation
+    ];
+    // Density-dependent cap: as population approaches carrying capacity,
+    // reproduction slows (logistic growth)
     const maxPrey = 120;
-    const preyOffspringRate =
-      survivingPrey.length < 10
-        ? 3
-        : survivingPrey.length < maxPrey * 0.5
-          ? 2
-          : 1;
+    const densityFactor = Math.max(0.1, 1.0 - survivingPrey.length / maxPrey);
+    // Effective offspring per survivor (continuous, applied probabilistically)
+    const baseOffspring =
+      survivingPrey.length < 6
+        ? 3.0 // critically low → breed fast
+        : survivingPrey.length < 15
+          ? 2.5
+          : 2.0;
+    const effectiveOffspring =
+      baseOffspring * foodMultiplier * predStress * densityFactor;
 
     for (const parent of survivingPrey) {
       if (newOrganisms.filter((o) => o.role !== "predator").length >= maxPrey)
         break;
-      for (let c = 0; c < preyOffspringRate; c++) {
+      // Integer part is guaranteed offspring; fractional part is probability of
+      // one additional offspring.
+      const guaranteed = Math.floor(effectiveOffspring);
+      const extra = Math.random() < effectiveOffspring - guaranteed ? 1 : 0;
+      const count = guaranteed + extra;
+      for (let c = 0; c < count; c++) {
         if (newOrganisms.filter((o) => o.role !== "predator").length >= maxPrey)
           break;
         newOrganisms.push({
