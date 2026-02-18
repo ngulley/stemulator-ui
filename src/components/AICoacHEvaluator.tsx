@@ -7,24 +7,22 @@ import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
-import { LabPart, ScienceLab } from "../types";
+import { LabPart, ScienceLab, SimulationState } from "../types";
 import { getGuidance, ScienceGuideRequest } from "../services/api";
-import {
-  evaluateStudentWork,
-  isOpenAIConfigured,
-  EvalResult,
-} from "../services/openai";
+import { evaluateStudentWork, EvalResult } from "../services/openai";
 
 interface AICoacHEvaluatorProps {
   lab: ScienceLab;
   part: LabPart;
   studentResponses: Record<string, string> | null;
+  simState: SimulationState;
 }
 
 const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
   lab,
   part,
   studentResponses,
+  simState,
 }) => {
   const [evaluation, setEvaluation] = useState<EvalResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,14 +40,32 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
     setLoading(true);
     setAiPowered(false);
 
+    // Helper: extract student responses whose key starts with a given prefix
+    const responsesByPrefix = (prefix: string): string[] =>
+      Object.entries(studentResponses || {})
+        .filter(([key]) => key.startsWith(`${prefix}-`))
+        .map(([, val]) => val)
+        .filter((v) => v.trim().length > 0);
+
+    // Build setup from current simulation parameters
+    const setupFromSim: string[] = [
+      `habitat=${simState.environment}`,
+      `predation=${simState.predation}`,
+      `food supply=${simState.foodAvailability}`,
+      `mutation rate=${simState.mutationRate * 10}%`,
+      `generation=${simState.generation}`,
+      `rabbits=${simState.organisms.filter((o) => o.role !== "predator").length}`,
+      `wolves=${simState.organisms.filter((o) => o.role === "predator").length}`,
+    ];
+
     // 1️⃣ Try backend guidance API first
     try {
       const request: ScienceGuideRequest = {
         studentName: "Student",
-        setup: part.setup,
-        observations: Object.values(studentResponses || {}),
-        evidence: part.evidence || [],
-        predictions: part.predictions,
+        setup: setupFromSim,
+        observations: responsesByPrefix("observations"),
+        evidence: responsesByPrefix("evidence"),
+        predictions: responsesByPrefix("predictions"),
       };
 
       const response = await getGuidance(lab._id, part.partId, request);
@@ -61,8 +77,8 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
       setApiGuidance(null);
     }
 
-    // 2️⃣ Try OpenAI for structured evaluation
-    if (isOpenAIConfigured() && studentResponses) {
+    // 2️⃣ Try chat/completions endpoint for structured evaluation
+    if (studentResponses) {
       try {
         const result = await evaluateStudentWork({
           labTitle: lab.title,
@@ -196,6 +212,23 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
         </div>
       </div>
 
+      {/* AI Backend Guidance — shown as soon as it arrives, even while evaluation is loading */}
+      {apiGuidance && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Brain className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h5 className="font-semibold text-indigo-900 text-sm mb-2">
+                AI Science Coach Guidance
+              </h5>
+              <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
+                {apiGuidance}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12">
           <div className="animate-spin mb-4">
@@ -241,23 +274,6 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
               {evaluation.feedback}
             </p>
           </div>
-
-          {/* AI Backend Guidance (if available) */}
-          {apiGuidance && (
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <Brain className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <h5 className="font-semibold text-indigo-900 text-sm mb-2">
-                    AI Science Coach Guidance
-                  </h5>
-                  <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
-                    {apiGuidance}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Strengths */}
           {evaluation.strengths.length > 0 && (

@@ -335,6 +335,7 @@ const LabDetail: React.FC = () => {
                     lab={lab}
                     part={lab.labParts[currentPartIdx]}
                     studentResponses={studentResponses}
+                    simState={state}
                   />
                 ) : (
                   <AIPanel
