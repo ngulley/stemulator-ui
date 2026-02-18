@@ -1,11 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Loader2, Bot, User, AlertCircle } from "lucide-react";
+import { Send, Sparkles, Loader2, Bot, User } from "lucide-react";
 import { SimulationState } from "../types";
-import {
-  chatWithCoach,
-  isOpenAIConfigured,
-  SimContext,
-} from "../services/openai";
+import { chatWithCoach, SimContext } from "../services/openai";
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -74,7 +70,6 @@ const AIPanel: React.FC<AIPanelProps> = (props) => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const configured = isOpenAIConfigured();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -94,12 +89,10 @@ const AIPanel: React.FC<AIPanelProps> = (props) => {
     try {
       const ctx = buildContext(props, simState);
       // Build history for multi-turn context (last 10 messages)
-      const history = [...messages, userMsg]
-        .slice(-10)
-        .map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        }));
+      const history = [...messages, userMsg].slice(-10).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
       // Remove the last user message since chatWithCoach adds it
       history.pop();
 
@@ -116,29 +109,6 @@ const AIPanel: React.FC<AIPanelProps> = (props) => {
       setLoading(false);
     }
   };
-
-  if (!configured) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-6">
-        <div className="p-3 bg-amber-100 rounded-full mb-3">
-          <AlertCircle className="w-6 h-6 text-amber-600" />
-        </div>
-        <h3 className="font-bold text-slate-900 mb-1">
-          AI Coach Not Configured
-        </h3>
-        <p className="text-sm text-slate-600 mb-3 max-w-xs">
-          Add your OpenAI API key to enable the AI Science Coach.
-        </p>
-        <code className="text-xs bg-slate-100 px-3 py-2 rounded-lg text-slate-700 font-mono">
-          VITE_OPENAI_API_KEY=sk-...
-        </code>
-        <p className="text-xs text-slate-500 mt-2">
-          Add this to your <span className="font-medium">.env</span> file and
-          restart the dev server.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-full">

@@ -1,27 +1,21 @@
 /**
- * OpenAI integration for STEMulator AI Coach
+ * AI Coach service for STEMulator
  *
  * Provides two capabilities:
  *   1. chatWithCoach()       — Free-form Q&A about the running simulation
  *   2. evaluateStudentWork() — Structured evaluation of student lab observations
  *
- * Uses the OpenAI Chat Completions API directly from the browser.
- * The API key is read from VITE_OPENAI_API_KEY (set in .env).
+ * All LLM calls are proxied through the backend at
+ *   POST /stemulator/v1/chat/completions
+ * so no API key is needed on the frontend.
  */
 
 // ---------------------------------------------------------------------------
-// Config
+// Config — uses the same base URL as the rest of the API layer
 // ---------------------------------------------------------------------------
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY as
-  | string
-  | undefined;
-const MODEL = "gpt-4o-mini";
-const API_URL = "https://api.openai.com/v1/chat/completions";
-
-export function isOpenAIConfigured(): boolean {
-  return !!OPENAI_API_KEY && OPENAI_API_KEY.startsWith("sk-");
-}
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/stemulator/v1";
+const CHAT_ENDPOINT = `${API_BASE_URL}/chat/completions`;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,36 +70,23 @@ interface ChatMessage {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-async function callOpenAI(
-  messages: ChatMessage[],
-  temperature = 0.7,
-  maxTokens = 800,
-): Promise<string> {
-  if (!isOpenAIConfigured()) {
-    throw new Error("OpenAI API key is not configured.");
-  }
-
-  const res = await fetch(API_URL, {
+async function callChat(messages: ChatMessage[]): Promise<string> {
+  const res = await fetch(CHAT_ENDPOINT, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
   });
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`OpenAI API error (${res.status}): ${body}`);
+    throw new Error(`AI Coach API error (${res.status}): ${body}`);
   }
 
   const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? "";
+  // Support both OpenAI-style response and simple { content: "..." } response
+  return (
+    data.choices?.[0]?.message?.content?.trim() ?? data.content?.trim() ?? ""
+  );
 }
 
 function buildSimContextBlock(ctx: SimContext): string {
@@ -160,7 +141,7 @@ ${buildSimContextBlock(context)}`,
     { role: "user", content: question },
   ];
 
-  return callOpenAI(messages, 0.7, 600);
+  return callChat(messages);
 }
 
 /**
@@ -218,7 +199,7 @@ ${studentAnswers}
 Evaluate the student's responses for scientific accuracy, depth, and completeness. Return ONLY the JSON object.`,
   };
 
-  const raw = await callOpenAI([system, user], 0.4, 600);
+  const raw = await callChat([system, user]);
 
   // Parse the JSON response (handle markdown code fences if present)
   const cleaned = raw
