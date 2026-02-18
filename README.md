@@ -161,18 +161,17 @@ Open [http://localhost:5173](http://localhost:5173) — navigate to **Labs** and
 │  Vite Dev Server │          │  /stemulator  │          │  labs     │
 │  Tailwind CSS    │          │  /v1/labs     │          │  collection│
 │  React Router    │          │  /v1/guides   │          │           │
-└────────┬─────────┘          └───────────────┘          └───────────┘
-         │
-         │  VITE_OPENAI_API_KEY
-         ▼
-  ┌──────────────┐
-  │  OpenAI API  │  ← AI Science Coach (chat + evaluation)
-  │  gpt-4o-mini │  ← Called directly from frontend
-  └──────────────┘
-         │
-  Falls back to:
-  • Backend /guides endpoint (if available)
-  • Local heuristic evaluation (always available)
+└──────────────────┘          │  /v1/chat/*   │          └───────────┘
+                              └──────┬────────┘
+                                     │
+                                     ▼
+                              ┌──────────────┐
+                              │  OpenAI API  │  ← API key stays on server
+                              │  (LLM)      │  ← Never exposed to browser
+                              └──────────────┘
+
+  Frontend falls back to local heuristic evaluation
+  if the backend is unavailable.
 ```
 
 ---
@@ -201,7 +200,7 @@ STEMulator/
 │   │
 │   ├── services/
 │   │   ├── api.ts              # Backend API service (getLabs, getLab, getGuidance, createLab)
-│   │   └── openai.ts           # OpenAI integration (chatWithCoach, evaluateStudentWork)
+│   │   └── openai.ts           # AI Coach service (proxied through backend /chat/completions)
 │   │
 │   ├── components/
 │   │   ├── Navbar.tsx          # Top navigation bar
@@ -320,12 +319,13 @@ Students type their responses into text fields, then click **Submit for Feedback
 
 ### Endpoints Used
 
-| Method | Endpoint                                          | Used By         | Purpose          |
-| ------ | ------------------------------------------------- | --------------- | ---------------- |
-| `GET`  | `/stemulator/v1/labs`                             | Labs page       | Fetch all labs   |
-| `GET`  | `/stemulator/v1/labs/{labId}`                     | Lab Detail page | Fetch single lab |
-| `POST` | `/stemulator/v1/guides/lab/{labId}/part/{partId}` | AI Coach        | Get AI feedback  |
-| `POST` | `/stemulator/v1/labs`                             | (Future)        | Create new lab   |
+| Method | Endpoint                                          | Used By         | Purpose            |
+| ------ | ------------------------------------------------- | --------------- | ------------------ |
+| `GET`  | `/stemulator/v1/labs`                             | Labs page       | Fetch all labs     |
+| `GET`  | `/stemulator/v1/labs/{labId}`                     | Lab Detail page | Fetch single lab   |
+| `POST` | `/stemulator/v1/guides/lab/{labId}/part/{partId}` | AI Coach        | Get AI feedback    |
+| `POST` | `/stemulator/v1/chat/completions`                 | AI Coach        | LLM chat (proxied) |
+| `POST` | `/stemulator/v1/labs`                             | (Future)        | Create new lab     |
 
 ### Proxy Configuration
 
@@ -358,39 +358,27 @@ Copy `.env.example` to `.env` and configure as needed:
 cp .env.example .env
 ```
 
-| Variable              | Default                | Description                                                                                                               |
-| --------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_API_URL`        | _(empty — uses proxy)_ | Backend API URL. Leave blank for local dev with Vite proxy. Set to full URL for production.                               |
-| `VITE_OPENAI_API_KEY` | _(empty)_              | OpenAI API key for the AI Science Coach. Get one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys). |
+| Variable       | Default                | Description                                                                                 |
+| -------------- | ---------------------- | ------------------------------------------------------------------------------------------- |
+| `VITE_API_URL` | _(empty — uses proxy)_ | Backend API URL. Leave blank for local dev with Vite proxy. Set to full URL for production. |
 
 **Local development:** Leave `VITE_API_URL` empty. The Vite proxy in `vite.config.ts` forwards `/stemulator/*` requests to `localhost:8080`.
 
 **Production:** Set `VITE_API_URL=https://your-api-server.com/stemulator/v1`.
 
-### AI Science Coach Setup
+### AI Science Coach
 
-The AI Coach uses **GPT-4o-mini** via the OpenAI API. To enable it:
+The AI Coach is powered by LLM calls that are **proxied through the backend** at `POST /stemulator/v1/chat/completions`. The OpenAI API key is configured on the backend — no API key is needed on the frontend.
 
-```bash
-# 1. Get an API key from https://platform.openai.com/api-keys
-# 2. Add it to your .env file
-echo 'VITE_OPENAI_API_KEY=sk-your-key-here' >> .env
+The frontend sends chat messages to the backend, which forwards them to the LLM and returns the response. This keeps the API key secure on the server and never exposed to the browser.
 
-# 3. Restart the dev server (Vite picks up .env changes on restart)
-npm run dev
-```
-
-**Without the key:** The AI Feedback tab shows a "not configured" notice, and the student evaluator falls back to local heuristic scoring.
-
-**With the key:** Students can:
+**When the backend is available:** Students can:
 
 - Chat with the AI Coach about their simulation in real time
 - Use quick actions: "Explain what's happening", "Why did this happen?", "What should I try next?"
-- Receive GPT-powered evaluation of their lab observations with scores, strengths, and guidance
+- Receive LLM-powered evaluation of their lab observations with scores, strengths, and guidance
 
-**Cost:** GPT-4o-mini is very affordable (~$0.15 per 1M input tokens). A typical student session uses a few cents.
-
-> ⚠️ **Security note:** The API key is stored in `.env` (gitignored) and exposed to the browser via `VITE_` prefix. For production, consider proxying OpenAI calls through your backend instead.
+**When the backend is unavailable:** The student evaluator falls back to local heuristic scoring.
 
 ---
 
@@ -444,12 +432,17 @@ curl -s http://localhost:8080/stemulator/v1/labs | python3 -m json.tool | head -
 # Look for "labId" vs "_id" in the response
 ```
 
-### AI Coach shows "Not Configured"
+### AI Coach not responding
 
-1. Make sure `VITE_OPENAI_API_KEY` is set in your `.env` file (not `.env.example`)
-2. The key must start with `sk-` to be recognized
-3. Restart the dev server after editing `.env` — Vite doesn't hot-reload env changes
-4. Check the browser console for OpenAI API errors (401 = invalid key, 429 = rate limit)
+1. Make sure the backend is running: `curl http://localhost:8080/stemulator/v1/labs`
+2. Test the chat endpoint directly:
+   ```bash
+   curl -s -X POST http://localhost:8080/stemulator/v1/chat/completions \
+     -H 'Content-Type: application/json' \
+     -d '{"messages":[{"role":"user","content":"Hello"}]}'
+   ```
+3. Check the backend logs for OpenAI API errors (the API key is configured server-side)
+4. If the backend is down, the evaluator falls back to local heuristic scoring
 
 ### Canvas is blank
 
