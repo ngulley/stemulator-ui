@@ -30,7 +30,7 @@ const envOptions: {
   },
   {
     value: "desert",
-    label: "Savanna",
+    label: "Desert",
     icon: <Sun className="w-3.5 h-3.5" />,
     emoji: "🏜️",
   },
