@@ -219,6 +219,7 @@ const Controls: React.FC<ControlsProps> = ({
         </button>
         <button
           onClick={onReset}
+          aria-label="Reset"
           className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-200 text-slate-700 rounded-lg font-semibold text-xs hover:bg-slate-300 transition-colors"
         >
           <RotateCcw className="w-3.5 h-3.5" />

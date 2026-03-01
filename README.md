@@ -19,6 +19,7 @@ An AI-guided virtual STEM lab platform with interactive courses and real-time Na
 - [API Integration](#api-integration)
 - [Environment Variables](#environment-variables)
 - [Available Scripts](#available-scripts)
+- [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -384,13 +385,60 @@ The frontend sends chat messages to the backend, which forwards them to the LLM 
 
 ## Available Scripts
 
-| Command           | Description                                  |
-| ----------------- | -------------------------------------------- |
-| `npm install`     | Install all dependencies                     |
-| `npm run dev`     | Start Vite dev server on port 5173           |
-| `npm run build`   | Type-check with TSC and build for production |
-| `npm run preview` | Preview the production build locally         |
-| `npm run lint`    | Run ESLint on all TypeScript files           |
+| Command               | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `npm install`         | Install all dependencies                     |
+| `npm run dev`         | Start Vite dev server on port 5173           |
+| `npm run build`       | Type-check with TSC and build for production |
+| `npm run preview`     | Preview the production build locally         |
+| `npm run lint`        | Run ESLint on all TypeScript files           |
+| `npm test`            | Run all unit tests (single pass)             |
+| `npm run test:watch`  | Run tests in watch mode (re-runs on save)    |
+| `npm run test:coverage` | Run tests and generate V8 coverage report  |
+
+---
+
+## Testing
+
+The frontend uses [Vitest](https://vitest.dev/) with [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) and [happy-dom](https://github.com/capricorn86/happy-dom) as the DOM environment.
+
+```bash
+# Run all tests
+npm test
+
+# Watch mode (re-runs on file save)
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
+```
+
+### Test Results (44 / 44 passing)
+
+| File | Suite | Tests | Status |
+|---|---|---|---|
+| `simulation.test.ts` | Initial State | Starts at gen 0 · ~50 organisms · ~85% prey/15% predators · forest env · medium predation & food · mutationRate 5 · all organisms alive · traits in 0–10 | ✅ 8/8 |
+| `simulation.test.ts` | `runGeneration()` | Increments by 1 · cumulative increments · logs action per gen · records population history · prey cap ≤120 · predator cap ≤25 · predator floor (medium) · offspring traits 0–10 | ✅ 8/8 |
+| `simulation.test.ts` | `updateSettings()` | Updates environment · predation · foodAvailability · mutationRate · logs action · partial update preserves unrelated fields | ✅ 6/6 |
+| `simulation.test.ts` | `reset()` | Generation → 0 · clears population history · clears actions log · env → forest · reinitializes organisms | ✅ 5/5 |
+| `simulation.test.ts` | `getLabSnapshot()` | Returns environment · parameters · alive population count · ≤10 last actions | ✅ 4/4 |
+| `simulation.test.ts` | Selection Pressure | High predation reduces prey more than low predation over 10 gens (5-trial average) | ✅ 1/1 |
+| `Controls.test.tsx` | Controls | Renders Next Generation button · Reset button · fires `onRunGeneration` · fires `onReset` · displays mutation rate % | ✅ 5/5 |
+| `AICoacHEvaluator.test.tsx` | AICoacHEvaluator | Submit prompt when no responses · loading state on mount · score displayed · feedback text · strengths · areas for improvement · Next Part button at ≥60 | ✅ 7/7 |
+
+### Test Coverage Summary
+
+| Source File | Covered | Not Covered |
+|---|---|---|
+| `src/simulation.ts` | `constructor`, `runGeneration()`, `updateSettings()`, `reset()`, `getLabSnapshot()`, `getState()` | `applyScienceLab()` |
+| `src/components/Controls.tsx` | Button rendering, `onRunGeneration`, `onReset`, mutation rate display | Habitat/predation/food toggle buttons |
+| `src/components/AICoacHEvaluator.tsx` | Null-state prompt, loading, score, feedback, strengths, improvements, pass threshold | Local offline fallback path |
+| `src/services/api.ts` | `getGuidance()` call path (mocked) | `getLabs`, `getLab`, `createLab`, `checkApiHealth` |
+| `src/services/openai.ts` | `evaluateStudentWork()` call path (mocked) | `chatWithCoach` |
+| `src/types.ts` | All interfaces validated via TS compilation | N/A (no runtime logic) |
+| `src/components/AIPanel.tsx` | — | Error bubble on failed chat |
+| `src/pages/Labs.tsx` | — | Offline banner on `getLabs` failure |
+| `src/pages/LabDetail.tsx` | — | Lab loading, part navigation |
 
 ---
 
