@@ -180,7 +180,7 @@ Open [http://localhost:5173](http://localhost:5173) — navigate to **Labs** and
 ## Project Structure
 
 ```
-STEMulator/
+stemulator-ui/
 ├── index.html                  # HTML entry point
 ├── package.json                # Dependencies and scripts
 ├── vite.config.ts              # Vite config with API proxy
