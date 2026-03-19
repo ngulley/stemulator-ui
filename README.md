@@ -3,28 +3,11 @@
 An AI-guided virtual STEM lab platform with interactive courses and real-time Natural Selection simulations. Built with React, TypeScript, and Vite.
 
 > **Backend API repo:** [github.com/ngulley/stemulator-api](https://github.com/ngulley/stemulator-api)
->
-> **GitHub Pages landing page:** [ngulley.github.io/stemulator-ui](https://ngulley.github.io/stemulator-ui/)
-
----
-
-## GitHub Pages
-
-A project landing page lives in the [`docs/`](docs/) folder and is served via GitHub Pages.  
-It links to both the frontend and backend repos, showcases features, and provides quick-setup instructions.
-
-**To enable GitHub Pages:**
-
-1. Go to **Settings → Pages** in the `stemulator-ui` repository.
-2. Under **Build and deployment**, set **Source** → `Deploy from a branch`.
-3. Choose branch `main` and folder `/docs`, then click **Save**.
-4. The site will be live at `https://ngulley.github.io/stemulator-ui/` within a minute.
 
 ---
 
 ## Table of Contents
 
-- [GitHub Pages](#github-pages)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
