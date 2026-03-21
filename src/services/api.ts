@@ -1,4 +1,4 @@
-import { ScienceLab } from "../types";
+import { ScienceLab, SimStateSnapshot } from "../types";
 
 // API base URL - uses Vite proxy in development, can be overridden with VITE_API_URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/stemulator/v1";
@@ -10,6 +10,11 @@ export interface ScienceGuideRequest {
   observations: string[];
   evidence: string[];
   predictions: string[];
+  /**
+   * Full simulation state history from lab load → submission.
+   * index 0 = initial state, index length-1 = state at time of submission.
+   */
+  history: SimStateSnapshot[];
 }
 
 export interface ScienceGuideResponse {

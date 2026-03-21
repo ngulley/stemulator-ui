@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Sparkles, Loader2, Bot, User } from "lucide-react";
 import { SimulationState } from "../types";
-import { chatWithCoach, SimContext } from "../services/openai";
+import { chatWithCoach, SimContext, friendlyAIError } from "../services/openai";
 
-interface ChatMsg {
+export interface ChatMsg {
   role: "user" | "assistant";
   content: string;
 }
@@ -14,6 +14,8 @@ interface AIPanelProps {
   discipline: string;
   topic: string;
   subTopic: string;
+  messages: ChatMsg[];
+  onMessagesChange: (msgs: ChatMsg[]) => void;
 }
 
 const QUICK_ACTIONS = [
@@ -65,8 +67,7 @@ function buildContext(props: AIPanelProps, state: SimulationState): SimContext {
 }
 
 const AIPanel: React.FC<AIPanelProps> = (props) => {
-  const { simState } = props;
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const { simState, messages, onMessagesChange } = props;
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -82,14 +83,15 @@ const AIPanel: React.FC<AIPanelProps> = (props) => {
     if (!text.trim() || loading) return;
 
     const userMsg: ChatMsg = { role: "user", content: text.trim() };
-    setMessages((prev) => [...prev, userMsg]);
+    const withUser = [...messages, userMsg];
+    onMessagesChange(withUser);
     setInput("");
     setLoading(true);
 
     try {
       const ctx = buildContext(props, simState);
       // Build history for multi-turn context (last 10 messages)
-      const history = [...messages, userMsg].slice(-10).map((m) => ({
+      const history = withUser.slice(-10).map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       }));
@@ -97,13 +99,11 @@ const AIPanel: React.FC<AIPanelProps> = (props) => {
       history.pop();
 
       const reply = await chatWithCoach(text.trim(), ctx, history);
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      onMessagesChange([...withUser, { role: "assistant", content: reply }]);
     } catch (err) {
-      const errMsg =
-        err instanceof Error ? err.message : "Something went wrong";
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `⚠️ ${errMsg}` },
+      onMessagesChange([
+        ...withUser,
+        { role: "assistant", content: `⚠️ ${friendlyAIError(err)}` },
       ]);
     } finally {
       setLoading(false);
@@ -139,36 +139,65 @@ const AIPanel: React.FC<AIPanelProps> = (props) => {
           </div>
         )}
 
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            {msg.role === "assistant" && (
-              <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Bot className="w-3.5 h-3.5 text-purple-600" />
-              </div>
-            )}
+        {messages.map((msg, idx) => {
+          const isError =
+            msg.role === "assistant" && msg.content.startsWith("⚠️");
+          const prevUserMsg =
+            isError && idx > 0 && messages[idx - 1]?.role === "user"
+              ? messages[idx - 1].content
+              : null;
+          return (
             <div
-              className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 text-slate-800"
+              key={idx}
+              className={`flex gap-2 ${
+                msg.role === "user" ? "justify-end" : "justify-start"
               }`}
             >
-              {msg.content.split("\n").map((line, i) => (
-                <p key={i} className={i > 0 ? "mt-1.5" : ""}>
-                  {line}
-                </p>
-              ))}
-            </div>
-            {msg.role === "user" && (
-              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <User className="w-3.5 h-3.5 text-blue-600" />
+              {msg.role === "assistant" && (
+                <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Bot className="w-3.5 h-3.5 text-purple-600" />
+                </div>
+              )}
+              <div className="flex flex-col gap-1 max-w-[85%]">
+                <div
+                  className={`rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-blue-600 text-white"
+                      : isError
+                        ? "bg-red-50 border border-red-200 text-red-800"
+                        : "bg-slate-100 text-slate-800"
+                  }`}
+                >
+                  {msg.content.split("\n").map((line, i) => (
+                    <p key={i} className={i > 0 ? "mt-1.5" : ""}>
+                      {line}
+                    </p>
+                  ))}
+                </div>
+                {isError && prevUserMsg && (
+                  <button
+                    onClick={() => {
+                      // Remove the failed user message + this error, then retry
+                      onMessagesChange(
+                        messages.filter((_, i) => i !== idx - 1 && i !== idx),
+                      );
+                      send(prevUserMsg);
+                    }}
+                    disabled={loading}
+                    className="self-start text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full hover:bg-red-100 transition-colors disabled:opacity-50"
+                  >
+                    ↩ Retry
+                  </button>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+              {msg.role === "user" && (
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <User className="w-3.5 h-3.5 text-blue-600" />
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {loading && (
           <div className="flex gap-2 items-center">

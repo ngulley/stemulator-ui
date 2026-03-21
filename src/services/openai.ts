@@ -17,6 +17,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/stemulator/v1";
 const CHAT_ENDPOINT = `${API_BASE_URL}/chat/completions`;
 
+/** Maximum ms to wait for a chat response before aborting. */
+const TIMEOUT_MS = 30_000;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -71,15 +74,42 @@ interface ChatMessage {
 // ---------------------------------------------------------------------------
 
 async function callChat(messages: ChatMessage[]): Promise<string> {
-  const res = await fetch(CHAT_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(CHAT_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === "AbortError") {
+      throw new Error("AI Coach timed out. Please try again.");
+    }
+    throw new Error(
+      "Unable to reach AI Coach. Check your connection and try again.",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error(
+        "AI Coach is busy right now. Please wait a moment and try again.",
+      );
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("AI Coach is not configured. Contact your instructor.");
+    }
+    if (res.status >= 500) {
+      throw new Error("AI Coach service is temporarily unavailable.");
+    }
     const body = await res.text();
-    throw new Error(`AI Coach API error (${res.status}): ${body}`);
+    throw new Error(`AI Coach error (${res.status}): ${body}`);
   }
 
   const data = await res.json();
@@ -87,6 +117,16 @@ async function callChat(messages: ChatMessage[]): Promise<string> {
   return (
     data.choices?.[0]?.message?.content?.trim() ?? data.content?.trim() ?? ""
   );
+}
+
+/**
+ * Extract a user-facing error message from an AI-related exception.
+ * Since callChat() already throws descriptive messages, this mainly
+ * handles unexpected error types.
+ */
+export function friendlyAIError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return "Something went wrong with the AI Coach. Please try again.";
 }
 
 function buildSimContextBlock(ctx: SimContext): string {
@@ -213,10 +253,18 @@ Evaluate the student's responses for scientific accuracy, depth, and completenes
     parsed.overallScore = Math.max(0, Math.min(100, parsed.overallScore));
     return parsed;
   } catch {
-    // If parsing fails, return a reasonable default with the raw text as feedback
+    // Guard against surfacing a raw API error string as student-facing feedback.
+    // Only use the raw text if it looks like genuine prose content.
+    const looksLikeContent =
+      raw.length > 20 &&
+      !raw.toLowerCase().startsWith("ai coach") &&
+      !raw.toLowerCase().startsWith("error") &&
+      !raw.includes('{"error"');
     return {
       overallScore: 70,
-      feedback: raw,
+      feedback: looksLikeContent
+        ? raw
+        : "Your responses have been recorded. Review the guidance below to strengthen your answers.",
       strengths: ["Engagement with the simulation"],
       areasForImprovement: ["Try to be more specific in your observations"],
       guidance: "Continue exploring different simulation parameters.",

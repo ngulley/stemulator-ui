@@ -337,6 +337,27 @@ function drawEnvironmentDetails(
 /* ── Main Canvas component ─────────────────────────────── */
 const Canvas: React.FC<CanvasProps> = ({ organisms, environment }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Keep canvas intrinsic size in sync with its CSS-rendered size
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width === 0 || height === 0) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        canvas.width = Math.floor(width);
+        canvas.height = Math.floor(height);
+      }
+    });
+
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -361,8 +382,14 @@ const Canvas: React.FC<CanvasProps> = ({ organisms, environment }) => {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // ── subtle details ──
-    drawEnvironmentDetails(ctx, W, H, environment);
+    // ── scale so organism coords (0-800, 0-600) fill the full canvas ──
+    const scaleX = W / 800;
+    const scaleY = H / 600;
+    ctx.save();
+    ctx.scale(scaleX, scaleY);
+
+    // ── subtle details (drawn in logical 800×600 space) ──
+    drawEnvironmentDetails(ctx, 800, 600, environment);
 
     // ── draw prey first, predators on top ──
     const prey = organisms.filter((o) => o.alive && o.role !== "predator");
@@ -370,9 +397,11 @@ const Canvas: React.FC<CanvasProps> = ({ organisms, environment }) => {
 
     prey.forEach((org) => drawRabbit(ctx, org, environment));
     predators.forEach((org) => drawWolf(ctx, org));
+
+    ctx.restore();
   }, [organisms, environment]);
 
-  // Animation loop — move organisms
+  // Animation loop — move organisms, clamped to live canvas dimensions
   useEffect(() => {
     const interval = setInterval(() => {
       organisms.forEach((org) => {
@@ -387,12 +416,14 @@ const Canvas: React.FC<CanvasProps> = ({ organisms, environment }) => {
   }, [organisms]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={800}
-      height={600}
-      className="rounded-lg shadow-inner border border-slate-200"
-    />
+    <div ref={wrapperRef} className="w-full h-full">
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={600}
+        className="block w-full h-full"
+      />
+    </div>
   );
 };
 

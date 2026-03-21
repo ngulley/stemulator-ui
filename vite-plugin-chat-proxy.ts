@@ -45,7 +45,16 @@ export default function chatProxy(): Plugin {
             chunks.push(chunk as Buffer);
           }
           const bodyStr = Buffer.concat(chunks).toString();
-          const body = JSON.parse(bodyStr);
+
+          let body: Record<string, unknown>;
+          try {
+            body = JSON.parse(bodyStr);
+          } catch {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ error: "Invalid JSON in request body" }));
+            return;
+          }
 
           // ── Path 1: Try the Spring Boot backend first ──
           try {
@@ -107,6 +116,7 @@ export default function chatProxy(): Plugin {
                 temperature: body.temperature ?? 0.7,
                 max_tokens: body.max_tokens ?? 1024,
               }),
+              signal: AbortSignal.timeout(30_000), // 30s — matches frontend timeout
             });
 
             const data = await openaiRes.json();

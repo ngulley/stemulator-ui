@@ -12,11 +12,10 @@ import PageShell from "../components/PageShell";
 import Canvas from "../components/Canvas";
 import Controls from "../components/Controls";
 import Results from "../components/Results";
-import AIPanel from "../components/AIPanel";
+import AIPanel, { ChatMsg } from "../components/AIPanel";
 import LabContentPanel from "../components/LabContentPanel";
-import AICoacHEvaluator from "../components/AICoacHEvaluator";
 import { Simulation } from "../simulation";
-import { SimulationState, ScienceLab } from "../types";
+import { SimulationState, ScienceLab, SimStateSnapshot } from "../types";
 import { mockLabs } from "../data";
 import { getLab } from "../services/api";
 
@@ -27,11 +26,35 @@ const LabDetail: React.FC = () => {
   const [sim] = useState(() => new Simulation());
   const [state, setState] = useState<SimulationState>(sim.getState());
   const [activeTab, setActiveTab] = useState<"results" | "ai">("results");
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [currentPartIdx, setCurrentPartIdx] = useState(0);
-  const [studentResponses, setStudentResponses] = useState<Record<
-    string,
-    string
-  > | null>(null);
+  const [simHistory, setSimHistory] = useState<SimStateSnapshot[]>([]);
+
+  /** Capture a snapshot of the current simulation state. */
+  const buildSnapshot = (
+    s: SimulationState,
+    extraActions: string[] = [],
+  ): SimStateSnapshot => {
+    const prey = s.organisms.filter((o) => o.role !== "predator");
+    const predators = s.organisms.filter((o) => o.role === "predator");
+    const avg = (arr: number[]) =>
+      arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    return {
+      generation: s.generation,
+      environment: s.environment,
+      predation: s.predation,
+      foodAvailability: s.foodAvailability,
+      mutationRate: s.mutationRate,
+      totalPopulation: s.organisms.filter((o) => o.alive).length,
+      preyCount: prey.filter((o) => o.alive).length,
+      predatorCount: predators.filter((o) => o.alive).length,
+      survivalRate: s.survivalRate,
+      avgSpeed: parseFloat(avg(prey.map((o) => o.speed)).toFixed(2)),
+      avgCamouflage: parseFloat(avg(prey.map((o) => o.camouflage)).toFixed(2)),
+      avgSize: parseFloat(avg(prey.map((o) => o.size)).toFixed(2)),
+      actions: [...s.actions, ...extraActions],
+    };
+  };
 
   // Fetch lab data from API with fallback to mock
   useEffect(() => {
@@ -64,7 +87,10 @@ const LabDetail: React.FC = () => {
   useEffect(() => {
     if (lab && lab.labParts[currentPartIdx]) {
       sim.applyScienceLab(lab, lab.labParts[currentPartIdx].partId);
-      setState(sim.getState());
+      const initialState = sim.getState();
+      setState(initialState);
+      // Reset history: index 0 is the initial state for this lab part
+      setSimHistory([buildSnapshot(initialState, ["Lab part loaded"])]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPartIdx, lab]);
@@ -85,32 +111,39 @@ const LabDetail: React.FC = () => {
     >,
   ) => {
     sim.updateSettings(settings);
-    setState(sim.getState());
+    const newState = sim.getState();
+    setState(newState);
+    setSimHistory((prev) => [
+      ...prev,
+      buildSnapshot(newState, [
+        `Settings changed: ${JSON.stringify(settings)}`,
+      ]),
+    ]);
   };
 
   const handleRunGeneration = () => {
     sim.runGeneration();
-    setState(sim.getState());
+    const newState = sim.getState();
+    setState(newState);
+    setSimHistory((prev) => [
+      ...prev,
+      buildSnapshot(newState, [`Run generation ${newState.generation}`]),
+    ]);
   };
 
   const handleReset = () => {
     sim.reset();
     if (lab && lab.labParts[currentPartIdx]) {
       sim.applyScienceLab(lab, lab.labParts[currentPartIdx].partId);
-      setState(sim.getState());
+      const resetState = sim.getState();
+      setState(resetState);
+      setSimHistory([buildSnapshot(resetState, ["Simulation reset"])]);
     }
-  };
-
-  const handleObservationsSubmit = (responses: Record<string, string>) => {
-    setStudentResponses(responses);
-    setActiveTab("ai");
   };
 
   const goToPart = (idx: number) => {
     if (lab && idx >= 0 && idx < lab.labParts.length) {
       setCurrentPartIdx(idx);
-      setStudentResponses(null);
-      setActiveTab("results");
     }
   };
 
@@ -248,10 +281,18 @@ const LabDetail: React.FC = () => {
         {/* Left Column — Lab Workflow */}
         <div className="w-[420px] flex-shrink-0 border-r border-slate-200 flex flex-col overflow-hidden bg-white">
           <LabContentPanel
+            key={currentPartIdx}
             part={lab.labParts[currentPartIdx]}
             partNumber={currentPartIdx + 1}
             totalParts={lab.labParts.length}
-            onObservationsSubmit={handleObservationsSubmit}
+            lab={lab}
+            simState={state}
+            simHistory={simHistory}
+            onNextPart={
+              currentPartIdx < lab.labParts.length - 1
+                ? () => goToPart(currentPartIdx + 1)
+                : undefined
+            }
           />
         </div>
 
@@ -302,7 +343,7 @@ const LabDetail: React.FC = () => {
             </div>
           </div>
 
-          {/* Bottom row: Analysis / Feedback (full width) */}
+          {/* Bottom row: Analysis + AI Coach */}
           <div className="flex-1 flex px-3 pb-3 overflow-hidden min-h-0">
             <div className="flex-1 bg-white border border-slate-200 rounded-lg flex flex-col overflow-hidden min-w-0">
               <div className="flex border-b border-slate-200 bg-slate-50 flex-shrink-0">
@@ -324,19 +365,12 @@ const LabDetail: React.FC = () => {
                       : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  🤖 AI Feedback
+                  🤖 AI Coach
                 </button>
               </div>
               <div className="flex-1 p-3 text-sm overflow-y-auto">
                 {activeTab === "results" ? (
                   <Results state={state} />
-                ) : studentResponses ? (
-                  <AICoacHEvaluator
-                    lab={lab}
-                    part={lab.labParts[currentPartIdx]}
-                    studentResponses={studentResponses}
-                    simState={state}
-                  />
                 ) : (
                   <AIPanel
                     simState={state}
@@ -344,6 +378,8 @@ const LabDetail: React.FC = () => {
                     discipline={lab.discipline}
                     topic={lab.topic}
                     subTopic={lab.subTopic}
+                    messages={chatMessages}
+                    onMessagesChange={setChatMessages}
                   />
                 )}
               </div>

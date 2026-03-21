@@ -6,16 +6,29 @@ import {
   Lightbulb,
   ArrowRight,
   Sparkles,
+  RotateCcw,
 } from "lucide-react";
-import { LabPart, ScienceLab, SimulationState } from "../types";
+import {
+  LabPart,
+  ScienceLab,
+  SimulationState,
+  SimStateSnapshot,
+} from "../types";
 import { getGuidance, ScienceGuideRequest } from "../services/api";
-import { evaluateStudentWork, EvalResult } from "../services/openai";
+import {
+  evaluateStudentWork,
+  EvalResult,
+  friendlyAIError,
+} from "../services/openai";
 
 interface AICoacHEvaluatorProps {
   lab: ScienceLab;
   part: LabPart;
   studentResponses: Record<string, string> | null;
   simState: SimulationState;
+  simHistory: SimStateSnapshot[];
+  onNextPart?: () => void;
+  onRetry?: () => void;
 }
 
 const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
@@ -23,11 +36,15 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
   part,
   studentResponses,
   simState,
+  simHistory,
+  onNextPart,
+  onRetry,
 }) => {
   const [evaluation, setEvaluation] = useState<EvalResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiGuidance, setApiGuidance] = useState<string | null>(null);
   const [aiPowered, setAiPowered] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (studentResponses) {
@@ -39,75 +56,103 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
   const evaluateResponses = async () => {
     setLoading(true);
     setAiPowered(false);
+    setEvalError(null);
 
-    // Helper: extract student responses whose key starts with a given prefix
-    const responsesByPrefix = (prefix: string): string[] =>
-      Object.entries(studentResponses || {})
-        .filter(([key]) => key.startsWith(`${prefix}-`))
-        .map(([, val]) => val)
-        .filter((v) => v.trim().length > 0);
-
-    // Build setup from current simulation parameters
-    const setupFromSim: string[] = [
-      `habitat=${simState.environment}`,
-      `predation=${simState.predation}`,
-      `food supply=${simState.foodAvailability}`,
-      `mutation rate=${simState.mutationRate * 10}%`,
-      `generation=${simState.generation}`,
-      `rabbits=${simState.organisms.filter((o) => o.role !== "predator").length}`,
-      `wolves=${simState.organisms.filter((o) => o.role === "predator").length}`,
-    ];
-
-    // 1️⃣ Try backend guidance API first
     try {
-      const request: ScienceGuideRequest = {
-        studentName: "Student",
-        setup: setupFromSim,
-        observations: responsesByPrefix("observations"),
-        evidence: responsesByPrefix("evidence"),
-        predictions: responsesByPrefix("predictions"),
-      };
+      // Helper: extract student responses whose key starts with a given prefix
+      const responsesByPrefix = (prefix: string): string[] =>
+        Object.entries(studentResponses || {})
+          .filter(([key]) => key.startsWith(`${prefix}-`))
+          .map(([, val]) => val)
+          .filter((v) => v.trim().length > 0);
 
-      const response = await getGuidance(lab._id, part.partId, request);
-      if (response.guidance) {
-        setApiGuidance(response.guidance);
-      }
-    } catch (err) {
-      console.warn("Backend AI guidance unavailable:", err);
-      setApiGuidance(null);
-    }
+      // Build setup summary from the current (latest) snapshot for legacy fields
+      const currentSnap =
+        simHistory.length > 0 ? simHistory[simHistory.length - 1] : null;
+      const setupFromSim: string[] = currentSnap
+        ? [
+            `habitat=${currentSnap.environment}`,
+            `predation=${currentSnap.predation}`,
+            `food supply=${currentSnap.foodAvailability}`,
+            `mutation rate=${currentSnap.mutationRate * 10}%`,
+            `generation=${currentSnap.generation}`,
+            `rabbits=${currentSnap.preyCount}`,
+            `wolves=${currentSnap.predatorCount}`,
+          ]
+        : [
+            `habitat=${simState.environment}`,
+            `predation=${simState.predation}`,
+            `food supply=${simState.foodAvailability}`,
+            `mutation rate=${simState.mutationRate * 10}%`,
+            `generation=${simState.generation}`,
+            `rabbits=${simState.organisms.filter((o) => o.role !== "predator").length}`,
+            `wolves=${simState.organisms.filter((o) => o.role === "predator").length}`,
+          ];
 
-    // 2️⃣ Try chat/completions endpoint for structured evaluation
-    if (studentResponses) {
+      // Attach student responses to the last snapshot so the AI has full context at submission
+      const historyWithResponses: SimStateSnapshot[] =
+        simHistory.length > 0
+          ? [
+              ...simHistory.slice(0, -1),
+              {
+                ...simHistory[simHistory.length - 1],
+                studentResponses: studentResponses ?? undefined,
+              },
+            ]
+          : simHistory;
+
+      // 1️⃣ Try backend guidance API first
       try {
-        const result = await evaluateStudentWork({
-          labTitle: lab.title,
-          discipline: lab.discipline,
-          topic: lab.topic,
-          subTopic: lab.subTopic,
-          partTitle: part.title,
-          setup: part.setup,
-          observations: part.observations,
-          evidence: part.evidence || [],
-          predictions: part.predictions,
-          studentResponses,
-        });
-        setEvaluation(result);
-        setAiPowered(true);
-        setLoading(false);
-        return;
-      } catch (err) {
-        console.warn(
-          "OpenAI evaluation unavailable, using local fallback:",
-          err,
-        );
-      }
-    }
+        const request: ScienceGuideRequest = {
+          studentName: "Student",
+          setup: setupFromSim,
+          observations: responsesByPrefix("observations"),
+          evidence: responsesByPrefix("evidence"),
+          predictions: responsesByPrefix("predictions"),
+          history: historyWithResponses,
+        };
 
-    // 3️⃣ Fallback to local heuristics
-    const feedback = generateLocalFeedback();
-    setEvaluation(feedback);
-    setLoading(false);
+        const response = await getGuidance(lab._id, part.partId, request);
+        if (response.guidance) {
+          setApiGuidance(response.guidance);
+        }
+      } catch (err) {
+        console.warn("Backend AI guidance unavailable:", err);
+        setApiGuidance(null);
+      }
+
+      // 2️⃣ Try chat/completions endpoint for structured evaluation
+      if (studentResponses) {
+        try {
+          const result = await evaluateStudentWork({
+            labTitle: lab.title,
+            discipline: lab.discipline,
+            topic: lab.topic,
+            subTopic: lab.subTopic,
+            partTitle: part.title,
+            setup: part.setup,
+            observations: part.observations,
+            evidence: part.evidence || [],
+            predictions: part.predictions,
+            studentResponses,
+          });
+          setEvaluation(result);
+          setAiPowered(true);
+          return; // finally block still runs
+        } catch (err) {
+          console.warn(
+            "OpenAI evaluation unavailable, using local fallback:",
+            err,
+          );
+          setEvalError(friendlyAIError(err));
+        }
+      }
+
+      // 3️⃣ Fallback to local heuristics
+      setEvaluation(generateLocalFeedback());
+    } finally {
+      setLoading(false);
+    }
   };
 
   const generateLocalFeedback = (): EvalResult | null => {
@@ -229,6 +274,29 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
         </div>
       )}
 
+      {/* Fallback notice — shown when AI evaluation failed and local heuristics are in use */}
+      {evalError && !aiPowered && evaluation && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-amber-900">
+                AI evaluation unavailable — showing estimated score
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">{evalError}</p>
+            </div>
+          </div>
+          <button
+            onClick={evaluateResponses}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 flex-shrink-0"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Retry with AI
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex flex-col items-center justify-center py-12">
           <div className="animate-spin mb-4">
@@ -334,22 +402,49 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
             </div>
           </div>
 
-          {/* Next Button */}
-          {evaluation.overallScore >= 60 && (
+          {/* Action footer */}
+          {evaluation.overallScore >= 60 ? (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
               <div>
                 <p className="font-semibold text-green-900 text-sm">
                   Ready to continue?
                 </p>
                 <p className="text-xs text-green-800 mt-1">
-                  You've completed the observations for this part.
+                  {onNextPart
+                    ? "You've completed the observations for this part."
+                    : "You've completed all parts of this lab! 🎉"}
                 </p>
               </div>
-              <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold text-sm hover:bg-green-700 transition-colors">
-                Next Part
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {onNextPart && (
+                <button
+                  onClick={onNextPart}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold text-sm hover:bg-green-700 transition-colors"
+                >
+                  Next Part
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
+          ) : (
+            onRetry && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-amber-900 text-sm">
+                    Not quite there yet
+                  </p>
+                  <p className="text-xs text-amber-800 mt-1">
+                    Review the feedback above and strengthen your responses.
+                  </p>
+                </div>
+                <button
+                  onClick={onRetry}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg font-semibold text-sm hover:bg-amber-600 transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Revise & Retry
+                </button>
+              </div>
+            )
           )}
         </div>
       ) : (

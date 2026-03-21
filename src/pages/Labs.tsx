@@ -10,7 +10,9 @@ const Labs: React.FC = () => {
   const [labs, setLabs] = useState<ScienceLab[]>(mockLabs);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [disciplineFilter, setDisciplineFilter] = useState<string>("All");
   const [topicFilter, setTopicFilter] = useState<string>("All");
+  const [subTopicFilter, setSubTopicFilter] = useState<string>("All");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("All");
 
   useEffect(() => {
@@ -44,12 +46,67 @@ const Labs: React.FC = () => {
     fetchLabs();
   }, []);
 
-  const topics = ["All", ...Array.from(new Set(labs.map((lab) => lab.topic)))];
+  // Cascading filter option derivation
+  const disciplines = [
+    "All",
+    ...Array.from(new Set(labs.map((lab) => lab.discipline))).sort(),
+  ];
+
+  const topics = [
+    "All",
+    ...Array.from(
+      new Set(
+        labs
+          .filter(
+            (lab) =>
+              disciplineFilter === "All" || lab.discipline === disciplineFilter,
+          )
+          .map((lab) => lab.topic),
+      ),
+    ).sort(),
+  ];
+
+  const subTopics = [
+    "All",
+    ...Array.from(
+      new Set(
+        labs
+          .filter(
+            (lab) =>
+              (disciplineFilter === "All" ||
+                lab.discipline === disciplineFilter) &&
+              (topicFilter === "All" || lab.topic === topicFilter),
+          )
+          .map((lab) => lab.subTopic),
+      ),
+    ).sort(),
+  ];
+
   const difficulties = ["All", "Beginner", "Intermediate", "Advanced"];
+
+  const handleDisciplineChange = (value: string) => {
+    setDisciplineFilter(value);
+    setTopicFilter("All");
+    setSubTopicFilter("All");
+  };
+
+  const handleTopicChange = (value: string) => {
+    setTopicFilter(value);
+    setSubTopicFilter("All");
+  };
+
+  const activeFilterCount = [
+    disciplineFilter,
+    topicFilter,
+    subTopicFilter,
+    difficultyFilter,
+  ].filter((f) => f !== "All").length;
 
   const filteredLabs = labs.filter((lab) => {
     return (
+      (disciplineFilter === "All" || lab.discipline === disciplineFilter) &&
       (topicFilter === "All" || lab.topic === topicFilter) &&
+      (subTopicFilter === "All" || lab.subTopic === subTopicFilter) &&
       (difficultyFilter === "All" || lab.difficulty === difficultyFilter)
     );
   });
@@ -60,18 +117,41 @@ const Labs: React.FC = () => {
         {/* Filters */}
         <aside className="lg:w-1/4">
           <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 sticky top-20">
-            <h3 className="text-xl font-semibold text-slate-900 mb-6 flex items-center">
-              <Filter className="h-6 w-6 mr-3" />
+            <h3 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-2">
+              <Filter className="h-6 w-6" />
               Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-auto text-xs font-semibold bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
             </h3>
             <div className="space-y-6">
+              {/* Discipline */}
+              <div>
+                <label className="block text-base font-medium text-slate-700 mb-3">
+                  Discipline
+                </label>
+                <select
+                  value={disciplineFilter}
+                  onChange={(e) => handleDisciplineChange(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                >
+                  {disciplines.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {/* Topic */}
               <div>
                 <label className="block text-base font-medium text-slate-700 mb-3">
                   Topic
                 </label>
                 <select
                   value={topicFilter}
-                  onChange={(e) => setTopicFilter(e.target.value)}
+                  onChange={(e) => handleTopicChange(e.target.value)}
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   {topics.map((topic) => (
@@ -81,6 +161,24 @@ const Labs: React.FC = () => {
                   ))}
                 </select>
               </div>
+              {/* Sub Topic */}
+              <div>
+                <label className="block text-base font-medium text-slate-700 mb-3">
+                  Sub Topic
+                </label>
+                <select
+                  value={subTopicFilter}
+                  onChange={(e) => setSubTopicFilter(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                >
+                  {subTopics.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {/* Difficulty */}
               <div>
                 <label className="block text-base font-medium text-slate-700 mb-3">
                   Difficulty
@@ -97,6 +195,20 @@ const Labs: React.FC = () => {
                   ))}
                 </select>
               </div>
+              {/* Clear filters */}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => {
+                    setDisciplineFilter("All");
+                    setTopicFilter("All");
+                    setSubTopicFilter("All");
+                    setDifficultyFilter("All");
+                  }}
+                  className="w-full text-sm text-blue-600 hover:text-blue-800 font-medium py-2 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  Clear all filters
+                </button>
+              )}
             </div>
           </div>
         </aside>
@@ -133,9 +245,16 @@ const Labs: React.FC = () => {
                   <p className="text-slate-600 text-base mb-4 flex-1">
                     {lab.description}
                   </p>
-                  <span className="text-sm text-slate-500 mb-4 block">
-                    {lab.topic} • {lab.subTopic}
-                  </span>
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                      {lab.discipline}
+                    </span>
+                    <span className="text-xs text-slate-500">{lab.topic}</span>
+                    <span className="text-xs text-slate-400">·</span>
+                    <span className="text-xs text-slate-500">
+                      {lab.subTopic}
+                    </span>
+                  </div>
                   <Link
                     to={`/labs/${lab._id}`}
                     className="bg-blue-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-blue-700 text-center"

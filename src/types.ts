@@ -33,6 +33,30 @@ export interface LabSnapshot {
   last10Actions: string[];
 }
 
+/**
+ * A single snapshot of simulation state at a point in time.
+ * Used to build the history array passed to the guidance API.
+ * index 0 = initial state when lab part loaded; index length-1 = current state.
+ */
+export interface SimStateSnapshot {
+  generation: number;
+  environment: string;
+  predation: string;
+  foodAvailability: string;
+  mutationRate: number;
+  totalPopulation: number;
+  preyCount: number;
+  predatorCount: number;
+  survivalRate: number;
+  avgSpeed: number;
+  avgCamouflage: number;
+  avgSize: number;
+  /** User-triggered actions that led TO this state (e.g. "Run Generation", settings changes) */
+  actions: string[];
+  /** Student responses captured at submission time (only present on the final snapshot) */
+  studentResponses?: Record<string, string>;
+}
+
 export interface Module {
   id: string;
   title: string;
