@@ -1,0 +1,24 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import chatProxy from "./vite-plugin-chat-proxy";
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react(), chatProxy()],
+  server: {
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      "/stemulator": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+    },
+  },
+  test: {
+    environment: "happy-dom",
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+    exclude: ["node_modules", "dist"],
+  },
+});
