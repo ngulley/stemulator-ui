@@ -247,7 +247,7 @@ const LoginPage: React.FC = () => {
           className="nav-logo"
           style={{ textDecoration: "none", color: "inherit" }}
         >
-          <span className="nav-logo-stem">STEM</span>ulator
+          STEMulator
         </Link>
 
         <div className="nav-actions">
@@ -283,10 +283,7 @@ const LoginPage: React.FC = () => {
       {/* Hero */}
       <section className="hero">
         <div className="logo-center">
-          <div className="logo-text">
-            <span className="stem">STEM</span>
-            <span className="ulator">ulator</span>
-          </div>
+          <div className="logo-text">STEMulator</div>
         </div>
         <p className="tagline">
           Explore physics, chemistry, and biology through hands-on simulations
