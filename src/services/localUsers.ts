@@ -1,28 +1,36 @@
 /**
- * Local demo authentication backed by localStorage.
+ * Authentication layer backed by localStorage.
  *
- * Passwords are hashed with SHA-256 (via Web Crypto) before storage so that
- * plain-text credentials never touch localStorage.
+ * Supports two providers:
+ *   - "local"  — email/password with SHA-256 hashed credentials (demo only;
+ *                replace with bcrypt/Argon2 on the backend for production)
+ *   - "google" — Google OAuth via @react-oauth/google; the credential JWT is
+ *                decoded client-side and the public profile is persisted here
  *
- * NOTE: This is a front-end-only demo layer. A production build must use a
- * backend auth service (e.g. Spring Security + JWTs) so that credentials are
- * validated server-side and passwords are hashed server-side with bcrypt/Argon2.
+ * NOTE: This is a front-end-only demo layer. A production build must validate
+ * tokens server-side (Spring Security + Google token introspection endpoint).
  */
 
 const USERS_KEY = "stemulator_registered_users";
 const SESSION_KEY = "stemulator_session";
 
+export type AuthProvider = "local" | "google";
+
 export type StoredUser = {
   id: string;
   fullName: string;
   email: string;
-  /** SHA-256 hex digest of the password. */
+  /** SHA-256 hex digest of the password. Only set for local accounts. */
   passwordHash: string;
   createdAt: string;
 };
 
 /** Public shape — never includes the password hash. */
-export type PublicUser = Omit<StoredUser, "passwordHash">;
+export type PublicUser = Omit<StoredUser, "passwordHash"> & {
+  provider: AuthProvider;
+  /** Profile picture URL — populated for Google accounts. */
+  picture?: string;
+};
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -92,6 +100,7 @@ export async function registerUser(input: {
     fullName: created.fullName,
     email: created.email,
     createdAt: created.createdAt,
+    provider: "local",
   };
   return { ok: true, user: publicUser };
 }
@@ -115,6 +124,7 @@ export async function tryLogin(
     fullName: u.fullName,
     email: u.email,
     createdAt: u.createdAt,
+    provider: "local",
   };
   return { ok: true, user: publicUser };
 }
@@ -135,4 +145,35 @@ export function getSession(): PublicUser | null {
 
 export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY);
+}
+
+// ---------------------------------------------------------------------------
+// Google OAuth helpers
+// ---------------------------------------------------------------------------
+
+/** Payload shape decoded from a Google credential JWT. */
+export type GoogleCredentialPayload = {
+  sub: string; // Google user ID
+  name: string;
+  email: string;
+  picture: string;
+  iat: number;
+  exp: number;
+};
+
+/**
+ * Persist a Google-authenticated session.
+ * The raw credential JWT is decoded by the caller (via jwt-decode) and passed here.
+ */
+export function setGoogleSession(payload: GoogleCredentialPayload): PublicUser {
+  const user: PublicUser = {
+    id: payload.sub,
+    fullName: payload.name,
+    email: payload.email,
+    picture: payload.picture,
+    provider: "google",
+    createdAt: new Date().toISOString(),
+  };
+  setSession(user);
+  return user;
 }

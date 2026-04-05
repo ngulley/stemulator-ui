@@ -76,14 +76,24 @@ const Navbar: React.FC = () => {
 
             {session ? (
               <div className="flex items-center space-x-2">
-                {/* Initials avatar */}
-                <div
-                  className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold select-none"
-                  title={session.fullName}
-                  aria-label={`Signed in as ${session.fullName}`}
-                >
-                  {getInitials(session.fullName)}
-                </div>
+                {/* Avatar: Google photo if available, otherwise initials */}
+                {session.picture ? (
+                  <img
+                    src={session.picture}
+                    alt={session.fullName}
+                    title={session.fullName}
+                    className="h-8 w-8 rounded-full object-cover border border-slate-200"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div
+                    className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold select-none"
+                    title={session.fullName}
+                    aria-label={`Signed in as ${session.fullName}`}
+                  >
+                    {getInitials(session.fullName)}
+                  </div>
+                )}
 
                 {/* Name (hidden on small screens) */}
                 <span className="hidden lg:block text-sm font-medium text-slate-700 max-w-[120px] truncate">

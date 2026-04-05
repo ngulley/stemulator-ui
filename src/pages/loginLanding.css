@@ -396,3 +396,138 @@
   margin-top: -0.5rem;
   margin-bottom: 0.75rem;
 }
+
+/* ── Google button ── */
+.login-landing .btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff;
+  color: #3c4043;
+  border: 1.5px solid #dadce0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+  margin-bottom: 1rem;
+}
+
+.login-landing .btn-google:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #c0c4cb;
+  box-shadow: 0 1px 6px rgba(60, 64, 67, 0.12);
+}
+
+.login-landing .btn-google:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ── OR divider ── */
+.login-landing .divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0.25rem 0 1.25rem;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.login-landing .divider::before,
+.login-landing .divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+/* ── Password show/hide wrapper ── */
+.login-landing .input-password-wrap {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.login-landing .input-password-wrap input {
+  width: 100%;
+  padding-right: 40px;
+  margin-bottom: 0;
+}
+
+.login-landing .toggle-pw {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.login-landing .toggle-pw:hover {
+  color: #374151;
+}
+
+/* ── Password strength ── */
+.login-landing .strength-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.login-landing .strength-bar {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.login-landing .strength-segment {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  transition: background 0.3s;
+}
+
+.login-landing .strength-label {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Nav outline button ── */
+.login-landing .btn-outline-nav {
+  background: #fff;
+  color: #3b6ef5;
+  border: 1.5px solid #3b6ef5;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.login-landing .btn-outline-nav:hover {
+  background: #f0f4ff;
+}
+
+/* ── Nav logo accent ── */
+.login-landing .nav-logo-stem {
+  color: #3b6ef5;
+}
