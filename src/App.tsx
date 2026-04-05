@@ -1,20 +1,68 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import LoginPage from "./pages/LoginPage";
 import Home from "./pages/Home";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import Labs from "./pages/Labs";
 import LabDetail from "./pages/LabDetail";
+import PrivateRoute from "./components/PrivateRoute";
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/courses" element={<Courses />} />
-        <Route path="/courses/:id" element={<CourseDetail />} />
-        <Route path="/labs" element={<Labs />} />
-        <Route path="/labs/:labId" element={<LabDetail />} />
-        <Route path="/about" element={<div>About</div>} />
+        {/* Public — login / sign-up landing */}
+        <Route path="/" element={<LoginPage />} />
+
+        {/* Protected — require an active session */}
+        <Route
+          path="/home"
+          element={
+            <PrivateRoute>
+              <Home />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/courses"
+          element={
+            <PrivateRoute>
+              <Courses />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/courses/:id"
+          element={
+            <PrivateRoute>
+              <CourseDetail />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/labs"
+          element={
+            <PrivateRoute>
+              <Labs />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/labs/:labId"
+          element={
+            <PrivateRoute>
+              <LabDetail />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/about"
+          element={
+            <PrivateRoute>
+              <div>About</div>
+            </PrivateRoute>
+          }
+        />
       </Routes>
     </Router>
   );

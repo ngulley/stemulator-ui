@@ -1,0 +1,398 @@
+/* Scoped to login landing page only */
+.login-landing * {
+  box-sizing: border-box;
+}
+
+.login-landing {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f0f4f8;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.login-landing nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.login-landing .nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 18px;
+  color: #1a1a2e;
+}
+
+.login-landing .nav-search {
+  flex: 1;
+  max-width: 320px;
+  margin: 0 2rem;
+  padding: 8px 14px;
+  border: 1px solid #dde1e7;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #333;
+  background: #f8f9fb;
+  outline: none;
+}
+
+.login-landing .nav-search:focus {
+  border-color: #3b6ef5;
+}
+
+.login-landing .btn-create-nav {
+  background: #3b6ef5;
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.login-landing .btn-create-nav:hover {
+  background: #2955d6;
+}
+
+.login-landing .nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.login-landing .btn-signout-nav {
+  background: #fff;
+  color: #1a1a2e;
+  border: 1.5px solid #d0d6e2;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.login-landing .btn-signout-nav:hover {
+  border-color: #3b6ef5;
+  color: #3b6ef5;
+  background: #f8fafc;
+}
+
+/* Hero */
+.login-landing .hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 64px);
+  text-align: center;
+  padding: 2rem;
+}
+
+.login-landing .logo-center {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 2rem;
+  opacity: 0;
+  transform: scale(0.6);
+  animation: login-popIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s forwards;
+}
+
+.login-landing .logo-text {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 800;
+  color: #1a1a2e;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.login-landing .logo-text .stem {
+  color: #3b6ef5;
+}
+
+.login-landing .logo-text .ulator {
+  color: #1a1a2e;
+}
+
+.login-landing .tagline {
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
+  color: #5a6478;
+  max-width: 480px;
+  line-height: 1.6;
+  margin-bottom: 2.5rem;
+  opacity: 0;
+  animation: login-fadeUp 0.6s ease 0.9s forwards;
+}
+
+.login-landing .btn-group {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  opacity: 0;
+  animation: login-fadeUp 0.6s ease 1.2s forwards;
+}
+
+/* Buttons */
+.login-landing .btn-primary {
+  background: #3b6ef5;
+  color: #fff;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    transform 0.15s,
+    opacity 0.2s;
+}
+
+.login-landing .btn-primary:hover:not(:disabled) {
+  background: #2955d6;
+  transform: translateY(-2px);
+}
+
+.login-landing .btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-landing .btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.login-landing .btn-secondary {
+  background: #fff;
+  color: #1a1a2e;
+  border: 1.5px solid #d0d6e2;
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    transform 0.15s,
+    background 0.2s;
+}
+
+.login-landing .btn-secondary:hover {
+  border-color: #3b6ef5;
+  color: #3b6ef5;
+  transform: translateY(-2px);
+}
+
+.login-landing .btn-secondary:active {
+  transform: translateY(0);
+}
+
+/* Animations */
+@keyframes login-popIn {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes login-fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Floating particles */
+.login-landing .particles {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.login-landing .particle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.12;
+  animation: login-floatUp linear infinite;
+}
+
+@keyframes login-floatUp {
+  from {
+    transform: translateY(100vh) rotate(0deg);
+    opacity: 0.12;
+  }
+  to {
+    transform: translateY(-120px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.login-landing .hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Modal overlay */
+.login-landing .modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 30, 0.55);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.login-landing .modal-overlay.active {
+  display: flex;
+  animation: login-fadeIn 0.2s ease;
+}
+
+@keyframes login-fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal card */
+.login-landing .modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: min(420px, 90vw);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  animation: login-slideUp 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+  position: relative;
+}
+
+@keyframes login-slideUp {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.login-landing .modal h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+}
+
+.login-landing .modal p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+
+.login-landing .modal label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 5px;
+}
+
+.login-landing .modal input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #dde1e7;
+  border-radius: 8px;
+  font-size: 15px;
+  margin-bottom: 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+  color: #1a1a2e;
+}
+
+.login-landing .modal input:focus {
+  border-color: #3b6ef5;
+}
+
+.login-landing .modal .btn-primary {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  border-radius: 8px;
+}
+
+.login-landing .modal .switch-link {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.login-landing .modal .switch-link button.link-like {
+  color: #3b6ef5;
+  cursor: pointer;
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.login-landing .modal .switch-link button.link-like:hover {
+  text-decoration: underline;
+}
+
+.login-landing .close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #9ca3af;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.login-landing .close-btn:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+
+.login-landing .modal .error-msg {
+  color: #dc2626;
+  font-size: 13px;
+  margin-top: -0.5rem;
+  margin-bottom: 0.75rem;
+}
