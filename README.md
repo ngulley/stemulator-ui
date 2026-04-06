@@ -16,6 +16,7 @@ An AI-guided virtual STEM lab platform with interactive courses and real-time Na
 - [Project Structure](#project-structure)
 - [Application Workflow](#application-workflow)
 - [Pages & Routes](#pages-routes)
+- [Authentication](#authentication)
 - [API Integration](#api-integration)
 - [Environment Variables](#environment-variables)
 - [Available Scripts](#available-scripts)
@@ -43,16 +44,17 @@ An AI-guided virtual STEM lab platform with interactive courses and real-time Na
 
 ## Tech Stack
 
-| Layer          | Technology       | Version |
-| -------------- | ---------------- | ------- |
-| **Framework**  | React            | 18.2    |
-| **Language**   | TypeScript       | 5.2+    |
-| **Build Tool** | Vite             | 5.0+    |
-| **Styling**    | Tailwind CSS     | 3.4     |
-| **Routing**    | React Router     | 7.13    |
-| **Charts**     | Recharts         | 2.12    |
-| **Icons**      | Lucide React     | 0.563   |
-| **Canvas**     | HTML5 Canvas API | —       |
+| Layer          | Technology                       | Version    |
+| -------------- | -------------------------------- | ---------- |
+| **Framework**  | React                            | 18.2       |
+| **Language**   | TypeScript                       | 5.2+       |
+| **Build Tool** | Vite                             | 5.0+       |
+| **Styling**    | Tailwind CSS                     | 3.4        |
+| **Routing**    | React Router                     | 7.13       |
+| **Auth**       | @react-oauth/google + jwt-decode | 0.13 / 4.0 |
+| **Charts**     | Recharts                         | 2.12       |
+| **Icons**      | Lucide React                     | 0.563      |
+| **Canvas**     | HTML5 Canvas API                 | —          |
 
 ---
 
@@ -88,10 +90,15 @@ cd stemulator-ui
 # 2. Install dependencies
 npm install
 
-# 3. Start development server
+# 3. Create your local environment file
+cp .env.example .env
+# Optional: add your VITE_GOOGLE_CLIENT_ID to .env to enable Google Sign-In
+# The app loads and local email/password auth works without it.
+
+# 4. Start development server
 npm run dev
 
-# 4. Open in browser
+# 5. Open in browser
 #    → http://localhost:5173
 ```
 
@@ -184,16 +191,17 @@ stemulator-ui/
 ├── index.html                  # HTML entry point
 ├── package.json                # Dependencies and scripts
 ├── vite.config.ts              # Vite config with API proxy
+├── vite-plugin-chat-proxy.ts   # Dev-server plugin: proxies /chat/completions → backend or OpenAI
 ├── tsconfig.json               # TypeScript configuration
 ├── tailwind.config.js          # Tailwind CSS configuration
 ├── postcss.config.js           # PostCSS (Tailwind plugin)
 ├── eslint.config.js            # ESLint rules
-├── .env.example                # Environment variable template
-├── .gitignore                  # Git ignore rules
+├── .env.example                # Environment variable template (copy to .env)
+├── .gitignore                  # Git ignore rules (.env is excluded)
 │
 ├── src/
-│   ├── main.tsx                # App entry point (React root)
-│   ├── App.tsx                 # Router with all routes
+│   ├── main.tsx                # App entry point — mounts GoogleOAuthProvider + React root
+│   ├── App.tsx                 # Router with public + protected routes
 │   ├── index.css               # Global styles + Tailwind directives
 │   ├── types.ts                # TypeScript interfaces (Organism, SimulationState, ScienceLab, etc.)
 │   ├── data.ts                 # Mock data (labs, courses) for offline mode
@@ -201,11 +209,13 @@ stemulator-ui/
 │   │
 │   ├── services/
 │   │   ├── api.ts              # Backend API service (getLabs, getLab, getGuidance, createLab)
-│   │   └── openai.ts           # AI Coach service (proxied through backend /chat/completions)
+│   │   ├── openai.ts           # AI Coach service (proxied through backend /chat/completions)
+│   │   └── localUsers.ts       # Auth layer: local email/password + Google OAuth, localStorage sessions
 │   │
 │   ├── components/
-│   │   ├── Navbar.tsx          # Top navigation bar
+│   │   ├── Navbar.tsx          # Top navigation bar (shows avatar/initials when logged in)
 │   │   ├── PageShell.tsx       # Page layout wrapper (navbar + content)
+│   │   ├── PrivateRoute.tsx    # Route guard — redirects to / if no active session
 │   │   ├── Canvas.tsx          # HTML5 Canvas — renders rabbits, wolves, environments
 │   │   ├── Controls.tsx        # Lab controls — habitat, wolves, food, mutation rate
 │   │   ├── Results.tsx         # Analysis dashboard — population chart, trait bars, insights
@@ -217,7 +227,8 @@ stemulator-ui/
 │   │   └── StudentResponses.tsx# Student response forms
 │   │
 │   └── pages/
-│       ├── Home.tsx            # Landing page (/)
+│       ├── LoginPage.tsx       # Login/signup landing (/) — Google OAuth + local auth
+│       ├── Home.tsx            # Home page (/home) — hero, subjects, featured labs
 │       ├── Labs.tsx            # Lab listing (/labs)
 │       ├── LabDetail.tsx       # Lab player (/labs/:labId) — simulation + controls + analysis
 │       ├── Courses.tsx         # Course listing (/courses)
@@ -306,13 +317,47 @@ Students type their responses into text fields, then click **Submit for Feedback
 
 ## Pages & Routes
 
-| Route          | Page          | Component          | Description                                             |
-| -------------- | ------------- | ------------------ | ------------------------------------------------------- |
-| `/`            | Home          | `Home.tsx`         | Landing page with hero, subject explorer, featured labs |
-| `/labs`        | Labs          | `Labs.tsx`         | All available labs with discipline filter tabs          |
-| `/labs/:labId` | Lab Player    | `LabDetail.tsx`    | Full simulation environment with controls and analysis  |
-| `/courses`     | Courses       | `Courses.tsx`      | Course cards for Physics and Chemistry                  |
-| `/courses/:id` | Course Detail | `CourseDetail.tsx` | Course modules, lessons, and associated labs            |
+| Route          | Access    | Component          | Description                                            |
+| -------------- | --------- | ------------------ | ------------------------------------------------------ |
+| `/`            | Public    | `LoginPage.tsx`    | Login / sign-up landing — Google OAuth + local auth    |
+| `/home`        | Protected | `Home.tsx`         | Home page with hero, subject explorer, featured labs   |
+| `/labs`        | Protected | `Labs.tsx`         | All available labs with discipline filter tabs         |
+| `/labs/:labId` | Protected | `LabDetail.tsx`    | Full simulation environment with controls and analysis |
+| `/courses`     | Protected | `Courses.tsx`      | Course cards for Physics and Chemistry                 |
+| `/courses/:id` | Protected | `CourseDetail.tsx` | Course modules, lessons, and associated labs           |
+| `/about`       | Protected | _(placeholder)_    | About page (not yet implemented)                       |
+
+**Protected** routes require an active session and are wrapped in `PrivateRoute`, which redirects unauthenticated users to `/`.
+
+---
+
+## Authentication
+
+STEMulator uses a **frontend-only demo auth layer** backed by `localStorage` (`src/services/localUsers.ts`). Two providers are supported:
+
+| Provider   | How it works                                                                                                                                               |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local**  | Email + password. Password is SHA-256 hashed client-side before storage (demo only — not production-safe).                                                 |
+| **Google** | OAuth 2.0 via `@react-oauth/google`. User info is fetched from Google's userinfo endpoint and persisted in localStorage. Requires `VITE_GOOGLE_CLIENT_ID`. |
+
+### Auth Flow
+
+```
+User visits /
+  └── LoginPage renders (public route)
+        ├── Google Sign-In button → useGoogleLogin() → fetch userinfo → setGoogleSession()
+        └── Email/Password form  → tryLogin() / registerUser()     → setSession()
+              ↓ (either path)
+        Session stored in localStorage
+              ↓
+        Navigate to /home  ← PrivateRoute allows access
+```
+
+### Session Persistence
+
+Sessions survive page refresh (stored in `localStorage` under `stemulator_session`). To sign out, the **Navbar** calls `clearSession()` which removes the key and redirects back to `/`.
+
+> ⚠️ **Production note:** This layer is for demonstration only. A production build must validate Google tokens server-side (Spring Security + Google token introspection) and replace SHA-256 with bcrypt/Argon2 on the backend.
 
 ---
 
@@ -359,10 +404,11 @@ Copy `.env.example` to `.env` and configure as needed:
 cp .env.example .env
 ```
 
-| Variable                | Default                | Description                                                                                                        |
-| ----------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `VITE_API_URL`          | _(empty — uses proxy)_ | Backend API URL. Leave blank for local dev with Vite proxy. Set to full URL for production.                        |
-| `VITE_GOOGLE_CLIENT_ID` | _(required)_           | Google OAuth 2.0 client ID. Without it, Google Sign-In buttons appear but do nothing (app still loads). See below. |
+| Variable                | Default                | Description                                                                                                                                           |
+| ----------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_API_URL`          | _(empty — uses proxy)_ | Backend API URL. Leave blank for local dev with Vite proxy. Set to full URL for production.                                                           |
+| `VITE_GOOGLE_CLIENT_ID` | _(required)_           | Google OAuth 2.0 client ID. Without it, Google Sign-In buttons appear but do nothing (app still loads). See below.                                    |
+| `OPENAI_API_KEY`        | _(optional)_           | **Server-only** (no `VITE_` prefix — never sent to browser). Direct OpenAI fallback used by `vite-plugin-chat-proxy` when the backend is unavailable. |
 
 **Local development:** Leave `VITE_API_URL` empty. The Vite proxy in `vite.config.ts` forwards `/stemulator/*` requests to `localhost:8080`.
 
