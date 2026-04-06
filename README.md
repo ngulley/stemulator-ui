@@ -359,13 +359,28 @@ Copy `.env.example` to `.env` and configure as needed:
 cp .env.example .env
 ```
 
-| Variable       | Default                | Description                                                                                 |
-| -------------- | ---------------------- | ------------------------------------------------------------------------------------------- |
-| `VITE_API_URL` | _(empty — uses proxy)_ | Backend API URL. Leave blank for local dev with Vite proxy. Set to full URL for production. |
+| Variable                | Default                | Description                                                                                                        |
+| ----------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `VITE_API_URL`          | _(empty — uses proxy)_ | Backend API URL. Leave blank for local dev with Vite proxy. Set to full URL for production.                        |
+| `VITE_GOOGLE_CLIENT_ID` | _(required)_           | Google OAuth 2.0 client ID. Without it, Google Sign-In buttons appear but do nothing (app still loads). See below. |
 
 **Local development:** Leave `VITE_API_URL` empty. The Vite proxy in `vite.config.ts` forwards `/stemulator/*` requests to `localhost:8080`.
 
 **Production:** Set `VITE_API_URL=https://your-api-server.com/stemulator/v1`.
+
+### Setting up VITE_GOOGLE_CLIENT_ID
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**.
+2. Click **Create Credentials** → **OAuth client ID** → Application type: **Web application**.
+3. Under **Authorised JavaScript origins** add `http://localhost:5173` (and your production URL).
+4. Copy the generated client ID (format: `‹numbers›-‹hash›.apps.googleusercontent.com`).
+5. Add it to your `.env` file:
+
+```bash
+VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+```
+
+> **Note:** `.env` is git-ignored. Every developer needs their own copy. The app will still load without this variable — Google Sign-In will simply not work.
 
 ### AI Science Coach
 
@@ -443,6 +458,23 @@ npm run test:coverage
 ---
 
 ## Troubleshooting
+
+### App loads a blank page after a fresh pull
+
+The most common cause is a missing `.env` file (it is git-ignored and not committed).
+
+```bash
+# 1. Create your .env from the example
+cp .env.example .env
+
+# 2. Fill in VITE_GOOGLE_CLIENT_ID (see Environment Variables section above)
+#    Leave it empty if you don't need Google Sign-In — the app will still load.
+
+# 3. Restart the dev server
+npm run dev
+```
+
+If the page is still blank, open the browser DevTools console and look for errors.
 
 ### Frontend won't start
 
