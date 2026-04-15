@@ -5,6 +5,7 @@ import chatProxy from "./vite-plugin-chat-proxy";
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), chatProxy()],
+  base: "/",
   server: {
     proxy: {
       "/stemulator": {
