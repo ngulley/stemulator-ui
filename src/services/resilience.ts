@@ -168,6 +168,13 @@ export class CircuitBreaker {
       );
     }
   }
+
+  /** Reset the breaker to CLOSED with zero failures. Useful in tests. */
+  reset(): void {
+    this.state = "CLOSED";
+    this.failures = 0;
+    this.nextAttemptAt = 0;
+  }
 }
 
 // ---------------------------------------------------------------------------

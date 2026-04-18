@@ -24,7 +24,7 @@ import { logger } from "./logger";
 // ---------------------------------------------------------------------------
 // Circuit breaker for the AI Coach service
 // ---------------------------------------------------------------------------
-const aiCircuit = new CircuitBreaker({
+export const aiCircuit = new CircuitBreaker({
   name: "ai",
   failureThreshold: 3,
   resetTimeoutMs: 60_000,
@@ -96,20 +96,12 @@ async function callChat(messages: ChatMessage[]): Promise<string> {
 
     let res: Response;
     try {
-      res = await withRetry(
-        () =>
-          fetch(CHAT_ENDPOINT, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages }),
-            signal: controller.signal,
-          }),
-        {
-          maxAttempts: 2,
-          baseDelayMs: 1_000,
-          isRetryable: (r) => r.status >= 500 || r.status === 429,
-        },
-      );
+      res = await fetch(CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages }),
+        signal: controller.signal,
+      });
     } catch (err) {
       if ((err as Error).name === "AbortError") {
         logger.error("AI Coach request timed out");
