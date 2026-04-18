@@ -66,14 +66,8 @@ const Navbar: React.FC = () => {
             </Link>
           </div>
 
-          {/* Right side: search + user */}
+          {/* Right side: user */}
           <div className="flex items-center space-x-3">
-            <input
-              type="text"
-              placeholder="Search..."
-              className="hidden sm:block px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-
             {session ? (
               <div className="flex items-center space-x-2">
                 {/* Avatar: Google photo if available, otherwise initials */}
