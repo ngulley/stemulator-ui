@@ -17,7 +17,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/stemulator/v1";
 const CHAT_ENDPOINT = `${API_BASE_URL}/chat/completions`;
 
-import { CircuitBreaker, withRetry } from "./resilience";
+import { CircuitBreaker } from "./resilience";
 import { registerCircuitBreaker } from "./healthCheck";
 import { logger } from "./logger";
 
