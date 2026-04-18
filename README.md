@@ -18,6 +18,7 @@ An AI-guided virtual STEM lab platform with interactive courses and real-time Na
 - [Pages & Routes](#pages-routes)
 - [Authentication](#authentication)
 - [API Integration](#api-integration)
+- [Resilience & Observability](#resilience--observability)
 - [Environment Variables](#environment-variables)
 - [Available Scripts](#available-scripts)
 - [Testing](#testing)
@@ -39,6 +40,8 @@ An AI-guided virtual STEM lab platform with interactive courses and real-time Na
 | 📝 **Student Workflow**            | 4-step process: Setup → Observe → Evidence → Predict                     |
 | 🎨 **Canvas Rendering**            | Animated rabbits and wolves with environment-adaptive fur colors         |
 | 📱 **Responsive Design**           | Clean Tailwind CSS design system                                         |
+| 🛡️ **Resilience**                  | Retry with back-off, circuit breakers, timeouts on all API calls         |
+| 📡 **Observability**               | Structured logging, health-check polling, session TTL                    |
 
 ---
 
@@ -393,6 +396,49 @@ API available?
   └── NO  → Use mock data from src/data.ts
               └── Show "Using offline data" indicator
 ```
+
+---
+
+## Resilience & Observability
+
+### Resilience Patterns
+
+All external API calls are protected by three composable patterns defined in `src/services/resilience.ts`:
+
+| Pattern                             | Description                                                                                                           | Config                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Retry with exponential back-off** | Transient failures (5xx, 429, network errors) are retried up to N times with exponentially increasing delay + jitter  | Labs: 3 attempts / AI Coach: 2                          |
+| **Circuit breaker**                 | After consecutive failures the circuit opens and fails fast, preventing request pile-up. Recovers via HALF_OPEN probe | Labs: 5 failures / 30 s cooldown; AI: 3 failures / 60 s |
+| **Timeout**                         | Every fetch is wrapped in an `AbortController`-based deadline                                                         | Labs: 15 s, Guidance: 30 s, AI Coach: 30 s              |
+
+```
+resilientFetch(url, init, opts)
+  └─ Circuit Breaker
+       └─ Retry (exponential back-off + jitter)
+            └─ Timeout (AbortController)
+                 └─ fetch()
+```
+
+**Graceful degradation:** When the backend is unreachable, lab pages silently fall back to mock data from `src/data.ts`. The AI Coach shows a user-friendly error message. No raw infrastructure status is ever exposed to students.
+
+### Observability
+
+| Capability             | Implementation                | Details                                                                           |
+| ---------------------- | ----------------------------- | --------------------------------------------------------------------------------- |
+| **Structured logging** | `src/services/logger.ts`      | Levelled output (DEBUG/INFO/WARN/ERROR) with timestamps and JSON metadata         |
+| **Health checks**      | `src/services/healthCheck.ts` | Polls Labs API + AI Coach every 60 s; reports latency, HTTP status, circuit state |
+| **Error aggregation**  | `logger.getRecentErrors()`    | Rolling buffer of last 50 ERROR entries; subscribable for telemetry sinks         |
+| **Circuit state**      | `registerCircuitBreaker()`    | Breaker states are exposed to the health-check system for unified reporting       |
+
+In development, all logs go to the browser console. In production, the `defaultTransport` function in `logger.ts` can be swapped for a remote collector (CloudWatch, Datadog, etc.).
+
+### Security Hardening
+
+- **Input validation:** `labId` and other URL parameters are validated against `[a-zA-Z0-9_-]+` before interpolation
+- **Session TTL:** Sessions expire after 24 hours; stale sessions are auto-cleared from localStorage
+- **CSP header:** `Content-Security-Policy` meta tag restricts script, style, image, and connect sources
+- **No console leaks:** All `console.log/warn/error` calls replaced with the structured logger
+- **Google OAuth hardened:** `response.ok` validated before parsing userinfo JSON
 
 ---
 

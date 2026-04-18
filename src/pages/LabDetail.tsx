@@ -9,6 +9,7 @@ import {
   Circle,
 } from "lucide-react";
 import PageShell from "../components/PageShell";
+import { logger } from "../services/logger";
 import Canvas from "../components/Canvas";
 import Controls from "../components/Controls";
 import Results from "../components/Results";
@@ -74,7 +75,9 @@ const LabDetail: React.FC = () => {
           setLab(mockLab || null);
         }
       } catch (err) {
-        console.warn("Failed to fetch from API, using mock data:", err);
+        logger.warn("Failed to fetch from API, using mock data", {
+          error: (err as Error).message,
+        });
         const mockLab = mockLabs.find((l) => l._id === labId);
         setLab(mockLab || null);
       } finally {

@@ -123,7 +123,10 @@ const LoginPage: React.FC = () => {
       fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
         headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
       })
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`Google userinfo failed: ${r.status}`);
+          return r.json();
+        })
         .then((info) => {
           const user = setGoogleSession({
             sub: info.sub,

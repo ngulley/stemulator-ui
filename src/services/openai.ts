@@ -17,6 +17,20 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/stemulator/v1";
 const CHAT_ENDPOINT = `${API_BASE_URL}/chat/completions`;
 
+import { CircuitBreaker, withRetry } from "./resilience";
+import { registerCircuitBreaker } from "./healthCheck";
+import { logger } from "./logger";
+
+// ---------------------------------------------------------------------------
+// Circuit breaker for the AI Coach service
+// ---------------------------------------------------------------------------
+const aiCircuit = new CircuitBreaker({
+  name: "ai",
+  failureThreshold: 3,
+  resetTimeoutMs: 60_000,
+});
+registerCircuitBreaker("ai", aiCircuit);
+
 /** Maximum ms to wait for a chat response before aborting. */
 const TIMEOUT_MS = 30_000;
 
@@ -74,49 +88,68 @@ interface ChatMessage {
 // ---------------------------------------------------------------------------
 
 async function callChat(messages: ChatMessage[]): Promise<string> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  logger.info("AI Coach request initiated", { messageCount: messages.length });
 
-  let res: Response;
-  try {
-    res = await fetch(CHAT_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages }),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if ((err as Error).name === "AbortError") {
-      throw new Error("AI Coach timed out. Please try again.");
-    }
-    throw new Error(
-      "Unable to reach AI Coach. Check your connection and try again.",
-    );
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  return aiCircuit.exec(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  if (!res.ok) {
-    if (res.status === 429) {
-      throw new Error(
-        "AI Coach is busy right now. Please wait a moment and try again.",
+    let res: Response;
+    try {
+      res = await withRetry(
+        () =>
+          fetch(CHAT_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages }),
+            signal: controller.signal,
+          }),
+        {
+          maxAttempts: 2,
+          baseDelayMs: 1_000,
+          isRetryable: (r) => r.status >= 500 || r.status === 429,
+        },
       );
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        logger.error("AI Coach request timed out");
+        throw new Error("AI Coach timed out. Please try again.");
+      }
+      logger.error("AI Coach network error", { error: (err as Error).message });
+      throw new Error(
+        "Unable to reach AI Coach. Check your connection and try again.",
+      );
+    } finally {
+      clearTimeout(timeoutId);
     }
-    if (res.status === 401 || res.status === 403) {
-      throw new Error("AI Coach is not configured. Contact your instructor.");
-    }
-    if (res.status >= 500) {
-      throw new Error("AI Coach service is temporarily unavailable.");
-    }
-    const body = await res.text();
-    throw new Error(`AI Coach error (${res.status}): ${body}`);
-  }
 
-  const data = await res.json();
-  // Support both OpenAI-style response and simple { content: "..." } response
-  return (
-    data.choices?.[0]?.message?.content?.trim() ?? data.content?.trim() ?? ""
-  );
+    if (!res.ok) {
+      if (res.status === 429) {
+        logger.warn("AI Coach rate limited (429)");
+        throw new Error(
+          "AI Coach is busy right now. Please wait a moment and try again.",
+        );
+      }
+      if (res.status === 401 || res.status === 403) {
+        logger.error("AI Coach auth error", { status: res.status });
+        throw new Error("AI Coach is not configured. Contact your instructor.");
+      }
+      if (res.status >= 500) {
+        logger.error("AI Coach server error", { status: res.status });
+        throw new Error("AI Coach service is temporarily unavailable.");
+      }
+      const body = await res.text();
+      logger.error(`AI Coach error (${res.status})`, { body });
+      throw new Error(`AI Coach error (${res.status}): ${body}`);
+    }
+
+    const data = await res.json();
+    logger.info("AI Coach response received");
+    // Support both OpenAI-style response and simple { content: "..." } response
+    return (
+      data.choices?.[0]?.message?.content?.trim() ?? data.content?.trim() ?? ""
+    );
+  }); // end circuit breaker exec
 }
 
 /**

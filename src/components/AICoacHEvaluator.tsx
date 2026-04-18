@@ -8,6 +8,7 @@ import {
   Sparkles,
   RotateCcw,
 } from "lucide-react";
+import { logger } from "../services/logger";
 import {
   LabPart,
   ScienceLab,
@@ -117,7 +118,9 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
           setApiGuidance(response.guidance);
         }
       } catch (err) {
-        console.warn("Backend AI guidance unavailable:", err);
+        logger.warn("Backend AI guidance unavailable", {
+          error: (err as Error).message,
+        });
         setApiGuidance(null);
       }
 
@@ -140,10 +143,9 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
           setAiPowered(true);
           return; // finally block still runs
         } catch (err) {
-          console.warn(
-            "OpenAI evaluation unavailable, using local fallback:",
-            err,
-          );
+          logger.warn("OpenAI evaluation unavailable, using local fallback", {
+            error: (err as Error).message,
+          });
           setEvalError(friendlyAIError(err));
         }
       }
