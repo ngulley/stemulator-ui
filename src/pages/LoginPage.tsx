@@ -62,6 +62,13 @@ const LoginPage: React.FC = () => {
   const [, setSessionTick] = useState(0);
   const session = getSession();
 
+  // If already authenticated, redirect straight to Home
+  useEffect(() => {
+    if (session) {
+      navigate(HOME_ROUTE, { replace: true });
+    }
+  }, [session, navigate]);
+
   const [loginOpen, setLoginOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const [loading, setLoading] = useState(false);
