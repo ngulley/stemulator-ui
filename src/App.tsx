@@ -6,8 +6,16 @@ import CourseDetail from "./pages/CourseDetail";
 import Labs from "./pages/Labs";
 import LabDetail from "./pages/LabDetail";
 import PrivateRoute from "./components/PrivateRoute";
+import { useEffect } from "react";
+import { startHealthPolling, stopHealthPolling } from "./services/healthCheck";
 
 function App() {
+  // Silent health monitoring — logs only, nothing user-facing
+  useEffect(() => {
+    startHealthPolling();
+    return stopHealthPolling;
+  }, []);
+
   return (
     <Router>
       <Routes>

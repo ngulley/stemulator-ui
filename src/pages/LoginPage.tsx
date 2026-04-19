@@ -62,6 +62,13 @@ const LoginPage: React.FC = () => {
   const [, setSessionTick] = useState(0);
   const session = getSession();
 
+  // If already authenticated, redirect straight to Home
+  useEffect(() => {
+    if (session) {
+      navigate(HOME_ROUTE, { replace: true });
+    }
+  }, [session, navigate]);
+
   const [loginOpen, setLoginOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -116,7 +123,10 @@ const LoginPage: React.FC = () => {
       fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
         headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
       })
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`Google userinfo failed: ${r.status}`);
+          return r.json();
+        })
         .then((info) => {
           const user = setGoogleSession({
             sub: info.sub,

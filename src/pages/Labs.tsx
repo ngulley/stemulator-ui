@@ -5,6 +5,7 @@ import PageShell from "../components/PageShell";
 import { mockLabs } from "../data";
 import { getLabs } from "../services/api";
 import { ScienceLab } from "../types";
+import { logger } from "../services/logger";
 
 const Labs: React.FC = () => {
   const [labs, setLabs] = useState<ScienceLab[]>(mockLabs);
@@ -36,7 +37,9 @@ const Labs: React.FC = () => {
         setLabs(normalizedLabs);
         setError(null);
       } catch (err) {
-        console.warn("Failed to fetch from API, using mock data:", err);
+        logger.warn("Failed to fetch from API, using mock data", {
+          error: (err as Error).message,
+        });
         setError("Using offline data - backend unavailable");
         setLabs(mockLabs);
       } finally {

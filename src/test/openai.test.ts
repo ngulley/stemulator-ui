@@ -11,6 +11,7 @@ import {
   friendlyAIError,
   SimContext,
   // EvalRequest,
+  aiCircuit,
 } from "../services/openai";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -86,7 +87,10 @@ describe("friendlyAIError()", () => {
 // ── chatWithCoach ─────────────────────────────────────────────────────────────
 
 describe("chatWithCoach()", () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+    aiCircuit.reset();
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();

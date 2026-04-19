@@ -129,15 +129,46 @@ export async function tryLogin(
   return { ok: true, user: publicUser };
 }
 
+/** Session TTL — 24 hours. */
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface PersistedSession {
+  user: PublicUser;
+  expiresAt: number;
+}
+
 export function setSession(user: PublicUser): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  const session: PersistedSession = {
+    user,
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
 export function getSession(): PublicUser | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as PublicUser;
+    const parsed: unknown = JSON.parse(raw);
+
+    // Support new { user, expiresAt } format
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "user" in parsed &&
+      "expiresAt" in parsed
+    ) {
+      const session = parsed as PersistedSession;
+      if (Date.now() > session.expiresAt) {
+        // Session expired — clean up
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      return session.user;
+    }
+
+    // Legacy format: plain PublicUser object (auto-migrate)
+    return parsed as PublicUser;
   } catch {
     return null;
   }

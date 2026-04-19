@@ -1,7 +1,27 @@
 import { ScienceLab, SimStateSnapshot } from "../types";
+import { CircuitBreaker, resilientFetch } from "./resilience";
+import { registerCircuitBreaker } from "./healthCheck";
+import { logger } from "./logger";
 
 // API base URL - uses Vite proxy in development, can be overridden with VITE_API_URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/stemulator/v1";
+
+// ---------------------------------------------------------------------------
+// Circuit breaker for the Labs / Guidance API
+// ---------------------------------------------------------------------------
+const labsCircuit = new CircuitBreaker({
+  name: "labs",
+  failureThreshold: 5,
+  resetTimeoutMs: 30_000,
+});
+registerCircuitBreaker("labs", labsCircuit);
+
+/** Default resilience options for lab API calls. */
+const LABS_RESILIENCE = {
+  circuitBreaker: labsCircuit,
+  maxAttempts: 3,
+  timeoutMs: 15_000,
+} as const;
 
 // Request/Response types for AI guidance
 export interface ScienceGuideRequest {
@@ -21,6 +41,13 @@ export interface ScienceGuideResponse {
   guidance: string;
 }
 
+/** Validates that an ID is safe to interpolate into a URL path. */
+function assertSafeId(id: string, label = "id"): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw new Error(`Invalid ${label}: contains disallowed characters`);
+  }
+}
+
 /**
  * Normalize a lab object from the backend API.
  * The backend uses `labId` as the identifier, but the frontend expects `_id`.
@@ -36,11 +63,18 @@ function normalizeLab(data: Record<string, unknown>): ScienceLab {
  * Fetch all available science labs
  */
 export async function getLabs(): Promise<ScienceLab[]> {
-  const response = await fetch(`${API_BASE_URL}/labs`);
+  logger.info("Fetching all labs");
+  const response = await resilientFetch(
+    `${API_BASE_URL}/labs`,
+    {},
+    LABS_RESILIENCE,
+  );
   if (!response.ok) {
+    logger.error("Failed to fetch labs", { status: response.status });
     throw new Error(`Failed to fetch labs: ${response.statusText}`);
   }
   const data: Record<string, unknown>[] = await response.json();
+  logger.info(`Fetched ${data.length} labs`);
   return data.map(normalizeLab);
 }
 
@@ -48,11 +82,19 @@ export async function getLabs(): Promise<ScienceLab[]> {
  * Fetch a specific science lab by ID
  */
 export async function getLab(labId: string): Promise<ScienceLab | null> {
-  const response = await fetch(`${API_BASE_URL}/labs/${labId}`);
+  assertSafeId(labId, "labId");
+  logger.info(`Fetching lab ${labId}`);
+  const response = await resilientFetch(
+    `${API_BASE_URL}/labs/${labId}`,
+    {},
+    LABS_RESILIENCE,
+  );
   if (response.status === 404) {
+    logger.warn(`Lab ${labId} not found`);
     return null;
   }
   if (!response.ok) {
+    logger.error(`Failed to fetch lab ${labId}`, { status: response.status });
     throw new Error(`Failed to fetch lab: ${response.statusText}`);
   }
   const data: Record<string, unknown> = await response.json();
@@ -79,18 +121,27 @@ export async function getGuidance(
     formData.append("evidence", evidenceFile);
   }
 
-  const response = await fetch(
+  assertSafeId(labId, "labId");
+  logger.info(`Requesting guidance for lab ${labId} part ${partId}`);
+  const response = await resilientFetch(
     `${API_BASE_URL}/guides/lab/${labId}/part/${partId}`,
     {
       method: "POST",
       body: formData,
     },
+    { ...LABS_RESILIENCE, timeoutMs: 30_000 },
   );
 
   if (!response.ok) {
+    logger.error("Guidance request failed", {
+      labId,
+      partId,
+      status: response.status,
+    });
     throw new Error(`Failed to get guidance: ${response.statusText}`);
   }
 
+  logger.info("Guidance received successfully");
   return response.json();
 }
 
@@ -115,28 +166,40 @@ export async function createLab(
   formData.append("simulation", simulation);
   formData.append("screenshot", screenshot);
 
-  const response = await fetch(`${API_BASE_URL}/labs`, {
-    method: "POST",
-    body: formData,
-  });
+  logger.info("Creating new lab", { labId });
+  const response = await resilientFetch(
+    `${API_BASE_URL}/labs`,
+    {
+      method: "POST",
+      body: formData,
+    },
+    LABS_RESILIENCE,
+  );
 
   if (!response.ok) {
+    logger.error("Failed to create lab", { labId, status: response.status });
     throw new Error(`Failed to create lab: ${response.statusText}`);
   }
 
+  logger.info("Lab created successfully", { labId });
   return response.json();
 }
 
 /**
- * Check if the backend API is available
+ * Check if the backend API is available.
+ * @deprecated Use {@link import("./healthCheck").checkHealth} instead for
+ * comprehensive status including circuit-breaker state and latency.
  */
 export async function checkApiHealth(): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE_URL}/labs`, {
       method: "HEAD",
+      signal: AbortSignal.timeout(10_000),
     });
+    logger.debug("API health check", { ok: response.ok });
     return response.ok;
-  } catch {
+  } catch (err) {
+    logger.warn("API health check failed", { error: (err as Error).message });
     return false;
   }
 }
