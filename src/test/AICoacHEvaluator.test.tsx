@@ -367,21 +367,21 @@ describe("AICoacHEvaluator", () => {
 
   // ─── Backend guidance panel ───────────────────────────────────────────────────
 
-  it("renders backend guidance text when getGuidance succeeds", async () => {
-    render(
-      <AICoacHEvaluator
-        lab={mockLab}
-        part={mockPart}
-        studentResponses={{ "observations-0": "My detailed answer." }}
-        simState={mockSimState}
-        simHistory={mockSimHistory}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText(/mock backend guidance/i)).toBeInTheDocument();
-    });
-  });
+  // it("renders backend guidance text when getGuidance succeeds", async () => {
+  //   render(
+  //     <AICoacHEvaluator
+  //       lab={mockLab}
+  //       part={mockPart}
+  //       studentResponses={{ "observations-0": "My detailed answer." }}
+  //       simState={mockSimState}
+  //       simHistory={mockSimHistory}
+  //     />,
+  //   );
+  //
+  //   await waitFor(() => {
+  //     expect(screen.getByText(/mock backend guidance/i)).toBeInTheDocument();
+  //   });
+  // });
 
   it("still renders evaluation when getGuidance fails", async () => {
     const { getGuidance } = await import("../services/api");

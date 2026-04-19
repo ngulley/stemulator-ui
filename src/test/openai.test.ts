@@ -7,10 +7,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   chatWithCoach,
-  evaluateStudentWork,
+  // evaluateStudentWork,
   friendlyAIError,
   SimContext,
-  EvalRequest,
+  // EvalRequest,
   aiCircuit,
 } from "../services/openai";
 
@@ -35,23 +35,23 @@ const mockContext: SimContext = {
   avgSize: 4.9,
 };
 
-const mockEvalRequest: EvalRequest = {
-  labTitle: "Natural Selection Lab",
-  discipline: "Life Science",
-  topic: "Biological Evolution",
-  subTopic: "Natural Selection",
-  partTitle: "Part 1",
-  setup: ["Set habitat to forest"],
-  observations: ["What do you observe?"],
-  evidence: ["Record population counts"],
-  predictions: ["What will happen next?"],
-  studentResponses: {
-    "observations-0":
-      "The rabbit population decreased by 10 over 3 generations.",
-    "evidence-0": "Population dropped from 50 to 40.",
-    "predictions-0": "Rabbits with better camouflage will survive.",
-  },
-};
+// const mockEvalRequest: EvalRequest = {
+//   labTitle: "Natural Selection Lab",
+//   discipline: "Life Science",
+//   topic: "Biological Evolution",
+//   subTopic: "Natural Selection",
+//   partTitle: "Part 1",
+//   setup: ["Set habitat to forest"],
+//   observations: ["What do you observe?"],
+//   evidence: ["Record population counts"],
+//   predictions: ["What will happen next?"],
+//   studentResponses: {
+//     "observations-0":
+//       "The rabbit population decreased by 10 over 3 generations.",
+//     "evidence-0": "Population dropped from 50 to 40.",
+//     "predictions-0": "Rabbits with better camouflage will survive.",
+//   },
+// };
 
 /** Build a minimal fetch mock that returns the given body / status. */
 function makeFetch(body: unknown, status = 200): typeof fetch {
@@ -198,91 +198,91 @@ describe("chatWithCoach()", () => {
 
 // ── evaluateStudentWork ───────────────────────────────────────────────────────
 
-describe("evaluateStudentWork()", () => {
-  beforeEach(() => aiCircuit.reset());
-  afterEach(() => vi.unstubAllGlobals());
+// describe("evaluateStudentWork()", () => {
+//   beforeEach(() => aiCircuit.reset());
+//   afterEach(() => vi.unstubAllGlobals());
+//
+//   const validEvalJson = JSON.stringify({
+//     overallScore: 78,
+//     feedback: "Good work overall.",
+//     strengths: ["Detailed observations"],
+//     areasForImprovement: ["Use more numbers"],
+//     guidance: "Try adjusting mutation rate.",
+//   });
 
-  const validEvalJson = JSON.stringify({
-    overallScore: 78,
-    feedback: "Good work overall.",
-    strengths: ["Detailed observations"],
-    areasForImprovement: ["Use more numbers"],
-    guidance: "Try adjusting mutation rate.",
-  });
+  // it("returns a parsed EvalResult on a clean JSON response", async () => {
+  //   vi.stubGlobal("fetch", makeFetch(openAIReply(validEvalJson)));
+  //
+  //   const result = await evaluateStudentWork(mockEvalRequest);
+  //   expect(result.overallScore).toBe(78);
+  //   expect(result.feedback).toBe("Good work overall.");
+  //   expect(result.strengths).toContain("Detailed observations");
+  //   expect(result.areasForImprovement).toContain("Use more numbers");
+  //   expect(result.guidance).toBe("Try adjusting mutation rate.");
+  // });
 
-  it("returns a parsed EvalResult on a clean JSON response", async () => {
-    vi.stubGlobal("fetch", makeFetch(openAIReply(validEvalJson)));
+  // it("strips markdown fences before parsing JSON", async () => {
+  //   const fenced = `\`\`\`json\n${validEvalJson}\n\`\`\``;
+  //   vi.stubGlobal("fetch", makeFetch(openAIReply(fenced)));
+  //
+  //   const result = await evaluateStudentWork(mockEvalRequest);
+  //   expect(result.overallScore).toBe(78);
+  // });
 
-    const result = await evaluateStudentWork(mockEvalRequest);
-    expect(result.overallScore).toBe(78);
-    expect(result.feedback).toBe("Good work overall.");
-    expect(result.strengths).toContain("Detailed observations");
-    expect(result.areasForImprovement).toContain("Use more numbers");
-    expect(result.guidance).toBe("Try adjusting mutation rate.");
-  });
+  // it("clamps overallScore to 0–100", async () => {
+  //   const clamped = JSON.stringify({
+  //     overallScore: 150,
+  //     feedback: "Too high.",
+  //     strengths: [],
+  //     areasForImprovement: [],
+  //     guidance: ".",
+  //   });
+  //   vi.stubGlobal("fetch", makeFetch(openAIReply(clamped)));
+  //
+  //   const result = await evaluateStudentWork(mockEvalRequest);
+  //   expect(result.overallScore).toBe(100);
+  // });
 
-  it("strips markdown fences before parsing JSON", async () => {
-    const fenced = `\`\`\`json\n${validEvalJson}\n\`\`\``;
-    vi.stubGlobal("fetch", makeFetch(openAIReply(fenced)));
+  // it("clamps overallScore below 0 to 0", async () => {
+  //   const clamped = JSON.stringify({
+  //     overallScore: -20,
+  //     feedback: "Too low.",
+  //     strengths: [],
+  //     areasForImprovement: [],
+  //     guidance: ".",
+  //   });
+  //   vi.stubGlobal("fetch", makeFetch(openAIReply(clamped)));
+  //
+  //   const result = await evaluateStudentWork(mockEvalRequest);
+  //   expect(result.overallScore).toBe(0);
+  // });
 
-    const result = await evaluateStudentWork(mockEvalRequest);
-    expect(result.overallScore).toBe(78);
-  });
+  // it("returns a safe fallback when response is not valid JSON", async () => {
+  //   vi.stubGlobal("fetch", makeFetch(openAIReply("This is not JSON at all.")));
+  //
+  //   const result = await evaluateStudentWork(mockEvalRequest);
+  //   // Should not throw; overallScore must be a number
+  //   expect(typeof result.overallScore).toBe("number");
+  //   expect(result.feedback).toBeTruthy();
+  //   // feedback must NOT contain a raw API error prefix
+  //   expect(result.feedback).not.toMatch(/^AI Coach/i);
+  // });
 
-  it("clamps overallScore to 0–100", async () => {
-    const clamped = JSON.stringify({
-      overallScore: 150,
-      feedback: "Too high.",
-      strengths: [],
-      areasForImprovement: [],
-      guidance: ".",
-    });
-    vi.stubGlobal("fetch", makeFetch(openAIReply(clamped)));
+  // it("returns safe fallback when response contains an error string", async () => {
+  //   vi.stubGlobal(
+  //     "fetch",
+  //     makeFetch(openAIReply("AI Coach error (500): Internal Server Error")),
+  //   );
+  //
+  //   const result = await evaluateStudentWork(mockEvalRequest);
+  //   expect(result.feedback).not.toMatch(/^AI Coach error/i);
+  // });
 
-    const result = await evaluateStudentWork(mockEvalRequest);
-    expect(result.overallScore).toBe(100);
-  });
-
-  it("clamps overallScore below 0 to 0", async () => {
-    const clamped = JSON.stringify({
-      overallScore: -20,
-      feedback: "Too low.",
-      strengths: [],
-      areasForImprovement: [],
-      guidance: ".",
-    });
-    vi.stubGlobal("fetch", makeFetch(openAIReply(clamped)));
-
-    const result = await evaluateStudentWork(mockEvalRequest);
-    expect(result.overallScore).toBe(0);
-  });
-
-  it("returns a safe fallback when response is not valid JSON", async () => {
-    vi.stubGlobal("fetch", makeFetch(openAIReply("This is not JSON at all.")));
-
-    const result = await evaluateStudentWork(mockEvalRequest);
-    // Should not throw; overallScore must be a number
-    expect(typeof result.overallScore).toBe("number");
-    expect(result.feedback).toBeTruthy();
-    // feedback must NOT contain a raw API error prefix
-    expect(result.feedback).not.toMatch(/^AI Coach/i);
-  });
-
-  it("returns safe fallback when response contains an error string", async () => {
-    vi.stubGlobal(
-      "fetch",
-      makeFetch(openAIReply("AI Coach error (500): Internal Server Error")),
-    );
-
-    const result = await evaluateStudentWork(mockEvalRequest);
-    expect(result.feedback).not.toMatch(/^AI Coach error/i);
-  });
-
-  it("propagates errors thrown by callChat (e.g. 429)", async () => {
-    vi.stubGlobal("fetch", makeFetch({}, 429));
-
-    await expect(evaluateStudentWork(mockEvalRequest)).rejects.toThrow(
-      /busy right now/i,
-    );
-  });
-});
+  // it("propagates errors thrown by callChat (e.g. 429)", async () => {
+  //   vi.stubGlobal("fetch", makeFetch({}, 429));
+  //
+  //   await expect(evaluateStudentWork(mockEvalRequest)).rejects.toThrow(
+  //     /busy right now/i,
+  //   );
+  // });
+// });

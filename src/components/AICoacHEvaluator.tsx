@@ -44,6 +44,7 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
   const [evaluation, setEvaluation] = useState<EvalResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiGuidance, setApiGuidance] = useState<string | null>(null);
+  // const [setApiGuidance] = useState<string | null>(null);
   const [aiPowered, setAiPowered] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
 
@@ -101,6 +102,12 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
               },
             ]
           : simHistory;
+
+      // TODO: skip this call. Refactor later
+      setApiGuidance(null);
+      if (apiGuidance === null) {
+        console.log("API guidance is null");
+      }
 
       // 1️⃣ Try backend guidance API first
       try {
@@ -260,21 +267,21 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
       </div>
 
       {/* AI Backend Guidance — shown as soon as it arrives, even while evaluation is loading */}
-      {apiGuidance && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <Brain className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h5 className="font-semibold text-indigo-900 text-sm mb-2">
-                AI Science Coach Guidance
-              </h5>
-              <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
-                {apiGuidance}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/*{apiGuidance && (*/}
+      {/*  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">*/}
+      {/*    <div className="flex items-start gap-3">*/}
+      {/*      <Brain className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />*/}
+      {/*      <div className="flex-1">*/}
+      {/*        <h5 className="font-semibold text-indigo-900 text-sm mb-2">*/}
+      {/*          AI Science Coach Guidance*/}
+      {/*        </h5>*/}
+      {/*        <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">*/}
+      {/*          {apiGuidance}*/}
+      {/*        </p>*/}
+      {/*      </div>*/}
+      {/*    </div>*/}
+      {/*  </div>*/}
+      {/*)}*/}
 
       {/* Fallback notice — shown when AI evaluation failed and local heuristics are in use */}
       {evalError && !aiPowered && evaluation && (
