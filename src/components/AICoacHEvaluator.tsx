@@ -14,7 +14,7 @@ import {
   SimulationState,
   SimStateSnapshot,
 } from "../types";
-import { getGuidance, ScienceGuideRequest } from "../services/api";
+// import { getGuidance, ScienceGuideRequest } from "../services/api";
 import {
   evaluateStudentWork,
   EvalResult,
@@ -35,14 +35,15 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
   lab,
   part,
   studentResponses,
-  simState,
-  simHistory,
+  // simState,
+  // simHistory,
   onNextPart,
   onRetry,
 }) => {
   const [evaluation, setEvaluation] = useState<EvalResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [apiGuidance, setApiGuidance] = useState<string | null>(null);
+  // const [apiGuidance, setApiGuidance] = useState<string | null>(null);
+  const [apiGuidance] = useState<string | null>(null);
   const [aiPowered, setAiPowered] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
 
@@ -60,68 +61,68 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
 
     try {
       // Helper: extract student responses whose key starts with a given prefix
-      const responsesByPrefix = (prefix: string): string[] =>
-        Object.entries(studentResponses || {})
-          .filter(([key]) => key.startsWith(`${prefix}-`))
-          .map(([, val]) => val)
-          .filter((v) => v.trim().length > 0);
+      // const responsesByPrefix = (prefix: string): string[] =>
+      //   Object.entries(studentResponses || {})
+      //     .filter(([key]) => key.startsWith(`${prefix}-`))
+      //     .map(([, val]) => val)
+      //     .filter((v) => v.trim().length > 0);
 
       // Build setup summary from the current (latest) snapshot for legacy fields
-      const currentSnap =
-        simHistory.length > 0 ? simHistory[simHistory.length - 1] : null;
-      const setupFromSim: string[] = currentSnap
-        ? [
-            `habitat=${currentSnap.environment}`,
-            `predation=${currentSnap.predation}`,
-            `food supply=${currentSnap.foodAvailability}`,
-            `mutation rate=${currentSnap.mutationRate * 10}%`,
-            `generation=${currentSnap.generation}`,
-            `rabbits=${currentSnap.preyCount}`,
-            `wolves=${currentSnap.predatorCount}`,
-          ]
-        : [
-            `habitat=${simState.environment}`,
-            `predation=${simState.predation}`,
-            `food supply=${simState.foodAvailability}`,
-            `mutation rate=${simState.mutationRate * 10}%`,
-            `generation=${simState.generation}`,
-            `rabbits=${simState.organisms.filter((o) => o.role !== "predator").length}`,
-            `wolves=${simState.organisms.filter((o) => o.role === "predator").length}`,
-          ];
+      // const currentSnap =
+      //   simHistory.length > 0 ? simHistory[simHistory.length - 1] : null;
+      // const setupFromSim: string[] = currentSnap
+      //   ? [
+      //       `habitat=${currentSnap.environment}`,
+      //       `predation=${currentSnap.predation}`,
+      //       `food supply=${currentSnap.foodAvailability}`,
+      //       `mutation rate=${currentSnap.mutationRate * 10}%`,
+      //       `generation=${currentSnap.generation}`,
+      //       `rabbits=${currentSnap.preyCount}`,
+      //       `wolves=${currentSnap.predatorCount}`,
+      //     ]
+      //   : [
+      //       `habitat=${simState.environment}`,
+      //       `predation=${simState.predation}`,
+      //       `food supply=${simState.foodAvailability}`,
+      //       `mutation rate=${simState.mutationRate * 10}%`,
+      //       `generation=${simState.generation}`,
+      //       `rabbits=${simState.organisms.filter((o) => o.role !== "predator").length}`,
+      //       `wolves=${simState.organisms.filter((o) => o.role === "predator").length}`,
+      //     ];
 
       // Attach student responses to the last snapshot so the AI has full context at submission
-      const historyWithResponses: SimStateSnapshot[] =
-        simHistory.length > 0
-          ? [
-              ...simHistory.slice(0, -1),
-              {
-                ...simHistory[simHistory.length - 1],
-                studentResponses: studentResponses ?? undefined,
-              },
-            ]
-          : simHistory;
+      // const historyWithResponses: SimStateSnapshot[] =
+      //   simHistory.length > 0
+      //     ? [
+      //         ...simHistory.slice(0, -1),
+      //         {
+      //           ...simHistory[simHistory.length - 1],
+      //           studentResponses: studentResponses ?? undefined,
+      //         },
+      //       ]
+      //     : simHistory;
 
       // 1️⃣ Try backend guidance API first
-      try {
-        const request: ScienceGuideRequest = {
-          studentName: "Student",
-          setup: setupFromSim,
-          observations: responsesByPrefix("observations"),
-          evidence: responsesByPrefix("evidence"),
-          predictions: responsesByPrefix("predictions"),
-          history: historyWithResponses,
-        };
+      // try {
+      //   const request: ScienceGuideRequest = {
+      //     studentName: "Student",
+      //     setup: setupFromSim,
+      //     observations: responsesByPrefix("observations"),
+      //     evidence: responsesByPrefix("evidence"),
+      //     predictions: responsesByPrefix("predictions"),
+      //     history: historyWithResponses,
+      //   };
+      //
+      //   const response = await getGuidance(lab._id, part.partId, request);
+      //   if (response.guidance) {
+      //     setApiGuidance(response.guidance);
+      //   }
+      // } catch (err) {
+      //   console.warn("Backend AI guidance unavailable:", err);
+      //   setApiGuidance(null);
+      // }
 
-        const response = await getGuidance(lab._id, part.partId, request);
-        if (response.guidance) {
-          setApiGuidance(response.guidance);
-        }
-      } catch (err) {
-        console.warn("Backend AI guidance unavailable:", err);
-        setApiGuidance(null);
-      }
-
-      // 2️⃣ Try chat/completions endpoint for structured evaluation
+      // 2️⃣ Try /stemulator/v1/guides/eval endpoint for structured evaluation
       if (studentResponses) {
         try {
           const result = await evaluateStudentWork({
@@ -149,89 +150,89 @@ const AICoacHEvaluator: React.FC<AICoacHEvaluatorProps> = ({
       }
 
       // 3️⃣ Fallback to local heuristics
-      setEvaluation(generateLocalFeedback());
+      // setEvaluation(generateLocalFeedback());
     } finally {
       setLoading(false);
     }
   };
 
-  const generateLocalFeedback = (): EvalResult | null => {
-    if (!studentResponses) return null;
+  // const generateLocalFeedback = (): EvalResult | null => {
+  //   if (!studentResponses) return null;
+  //
+  //   const responses = Object.values(studentResponses);
+  //   const responseQuality = calculateQualityScore(responses);
+  //
+  //   return {
+  //     overallScore: responseQuality,
+  //     feedback: generateDetailedFeedback(responseQuality),
+  //     guidance: generateNextSteps(),
+  //     strengths: identifyStrengths(responses),
+  //     areasForImprovement: identifyAreas(responses),
+  //   };
+  // };
 
-    const responses = Object.values(studentResponses);
-    const responseQuality = calculateQualityScore(responses);
+  // const calculateQualityScore = (responses: string[]): number => {
+  //   return Math.floor(
+  //     Math.random() * 30 +
+  //       60 +
+  //       responses.filter((r) => r.length > 50).length * 10,
+  //   );
+  // };
 
-    return {
-      overallScore: responseQuality,
-      feedback: generateDetailedFeedback(responseQuality),
-      guidance: generateNextSteps(),
-      strengths: identifyStrengths(responses),
-      areasForImprovement: identifyAreas(responses),
-    };
-  };
+  // const generateDetailedFeedback = (score: number): string => {
+  //   if (score >= 85) {
+  //     return `Excellent work! Your observations for "${part.title}" are thorough and well-documented. You've identified the key factors affecting ${lab.subTopic.toLowerCase()}. Your understanding of the simulation parameters is demonstrated by the specific details you've noted.`;
+  //   } else if (score >= 70) {
+  //     return `Good observations! You've captured the main trends in "${part.title}". To improve, try to be more specific about the relationships between variables and their effects on the population. Consider quantifying your observations when possible.`;
+  //   } else {
+  //     return `Your observations for "${part.title}" show effort, but could be more detailed. Try to answer all parts of each question and explain the "why" behind what you observe. Think about how the setup instructions relate to your findings.`;
+  //   }
+  // };
 
-  const calculateQualityScore = (responses: string[]): number => {
-    return Math.floor(
-      Math.random() * 30 +
-        60 +
-        responses.filter((r) => r.length > 50).length * 10,
-    );
-  };
+  // const identifyStrengths = (responses: string[]): string[] => {
+  //   const strengths = [];
+  //   if (
+  //     responses.some(
+  //       (r) => r.includes("population") || r.includes("generation"),
+  //     )
+  //   ) {
+  //     strengths.push("Good tracking of population dynamics");
+  //   }
+  //   if (responses.some((r) => r.length > 100)) {
+  //     strengths.push("Detailed observations provided");
+  //   }
+  //   if (
+  //     responses.some(
+  //       (r) =>
+  //         r.includes("change") ||
+  //         r.includes("increase") ||
+  //         r.includes("decrease"),
+  //     )
+  //   ) {
+  //     strengths.push("Clear identification of trends");
+  //   }
+  //   return strengths.length > 0
+  //     ? strengths
+  //     : ["Engagement with the simulation"];
+  // };
 
-  const generateDetailedFeedback = (score: number): string => {
-    if (score >= 85) {
-      return `Excellent work! Your observations for "${part.title}" are thorough and well-documented. You've identified the key factors affecting ${lab.subTopic.toLowerCase()}. Your understanding of the simulation parameters is demonstrated by the specific details you've noted.`;
-    } else if (score >= 70) {
-      return `Good observations! You've captured the main trends in "${part.title}". To improve, try to be more specific about the relationships between variables and their effects on the population. Consider quantifying your observations when possible.`;
-    } else {
-      return `Your observations for "${part.title}" show effort, but could be more detailed. Try to answer all parts of each question and explain the "why" behind what you observe. Think about how the setup instructions relate to your findings.`;
-    }
-  };
+  // const identifyAreas = (responses: string[]): string[] => {
+  //   const areas = [];
+  //   if (responses.some((r) => r.length < 30)) {
+  //     areas.push("Provide more detailed responses");
+  //   }
+  //   if (!responses.some((r) => r.includes("because") || r.includes("why"))) {
+  //     areas.push("Explain the reasoning behind observations");
+  //   }
+  //   if (!responses.some((r) => r.match(/\d+/))) {
+  //     areas.push("Use specific numbers or data when possible");
+  //   }
+  //   return areas;
+  // };
 
-  const identifyStrengths = (responses: string[]): string[] => {
-    const strengths = [];
-    if (
-      responses.some(
-        (r) => r.includes("population") || r.includes("generation"),
-      )
-    ) {
-      strengths.push("Good tracking of population dynamics");
-    }
-    if (responses.some((r) => r.length > 100)) {
-      strengths.push("Detailed observations provided");
-    }
-    if (
-      responses.some(
-        (r) =>
-          r.includes("change") ||
-          r.includes("increase") ||
-          r.includes("decrease"),
-      )
-    ) {
-      strengths.push("Clear identification of trends");
-    }
-    return strengths.length > 0
-      ? strengths
-      : ["Engagement with the simulation"];
-  };
-
-  const identifyAreas = (responses: string[]): string[] => {
-    const areas = [];
-    if (responses.some((r) => r.length < 30)) {
-      areas.push("Provide more detailed responses");
-    }
-    if (!responses.some((r) => r.includes("because") || r.includes("why"))) {
-      areas.push("Explain the reasoning behind observations");
-    }
-    if (!responses.some((r) => r.match(/\d+/))) {
-      areas.push("Use specific numbers or data when possible");
-    }
-    return areas;
-  };
-
-  const generateNextSteps = (): string => {
-    return `Continue to the next lab part to test additional variables. Remember to keep detailed records of each change you make to the simulation parameters and how it affects the population traits.`;
-  };
+  // const generateNextSteps = (): string => {
+  //   return `Continue to the next lab part to test additional variables. Remember to keep detailed records of each change you make to the simulation parameters and how it affects the population traits.`;
+  // };
 
   return (
     <div className="space-y-6">
