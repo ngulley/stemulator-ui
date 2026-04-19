@@ -368,13 +368,13 @@ Sessions survive page refresh (stored in `localStorage` under `stemulator_sessio
 
 ### Endpoints Used
 
-| Method | Endpoint                                          | Used By         | Purpose            |
-| ------ | ------------------------------------------------- | --------------- | ------------------ |
-| `GET`  | `/stemulator/v1/labs`                             | Labs page       | Fetch all labs     |
-| `GET`  | `/stemulator/v1/labs/{labId}`                     | Lab Detail page | Fetch single lab   |
-| `POST` | `/stemulator/v1/guides/lab/{labId}/part/{partId}` | AI Coach        | Get AI feedback    |
-| `POST` | `/stemulator/v1/chat/completions`                 | AI Coach        | LLM chat (proxied) |
-| `POST` | `/stemulator/v1/labs`                             | (Future)        | Create new lab     |
+| Method | Endpoint                          | Used By         | Purpose                                                                   |
+| ------ |-----------------------------------| --------------- |---------------------------------------------------------------------------|
+| `GET`  | `/stemulator/v1/labs`             | Labs page       | Fetch all labs                                                            |
+| `GET`  | `/stemulator/v1/labs/{labId}`     | Lab Detail page | Fetch single lab                                                          |
+| `POST` | `/stemulator/v1/student_eval`     | AI Coach        | Evaluates the student's lab setup, observations, evidence and predictions |
+| `POST` | `/stemulator/v1/chat/completions` | AI Coach        | Facilitates preset and open-ended conversation with the LLM               |
+| `POST` | `/stemulator/v1/labs`             | (Future)        | Create new lab                                                            |
 
 ### Proxy Configuration
 
@@ -476,7 +476,7 @@ VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 
 ### AI Science Coach
 
-The AI Coach is powered by LLM calls that are **proxied through the backend** at `POST /stemulator/v1/chat/completions`. The OpenAI API key is configured on the backend — no API key is needed on the frontend.
+The AI Coach is powered by LLM calls that are **proxied through the backend** at `POST /stemulator/v1/chat/completions` and `POST /stemulator/v1/student_eval`. The OpenAI API key is configured on the backend — no API key is needed on the frontend.
 
 The frontend sends chat messages to the backend, which forwards them to the LLM and returns the response. This keeps the API key secure on the server and never exposed to the browser.
 
@@ -486,7 +486,7 @@ The frontend sends chat messages to the backend, which forwards them to the LLM 
 - Use quick actions: "Explain what's happening", "Why did this happen?", "What should I try next?"
 - Receive LLM-powered evaluation of their lab observations with scores, strengths, and guidance
 
-**When the backend is unavailable:** The student evaluator falls back to local heuristic scoring.
+**When the backend is unavailable:** The student evaluator returns an error.
 
 ---
 

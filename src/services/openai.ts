@@ -16,6 +16,7 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/stemulator/v1";
 const CHAT_ENDPOINT = `${API_BASE_URL}/chat/completions`;
+const STUDENT_EVAL_ENDPOINT = `${API_BASE_URL}/student_eval`;
 
 import { CircuitBreaker } from "./resilience";
 import { registerCircuitBreaker } from "./healthCheck";
@@ -86,6 +87,32 @@ interface ChatMessage {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+async function getStudentEval(messages: ChatMessage[]): Promise<EvalResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(STUDENT_EVAL_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+      signal: controller.signal,
+    });
+  } catch {
+    throw new Error(
+        "Failed to retrieve student evaluation results from server. Please try again later. If the problem persists, contact support assistance.",
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to retrieve student evaluation results from server. Please try again later. If the problem persists, contact support assistance.: ${response.statusText}`);
+  }
+
+  return response.json()
+}
 
 async function callChat(messages: ChatMessage[]): Promise<string> {
   logger.info("AI Coach request initiated", { messageCount: messages.length });
@@ -223,15 +250,15 @@ export async function evaluateStudentWork(
 
   const system: ChatMessage = {
     role: "system",
-    content: `You are an AI Science Coach evaluating a student's lab work in the STEMulator platform. You must be encouraging but honest. Evaluate the quality and scientific accuracy of their observations.
+    content: `You are an AI Science Coach evaluating a student's lab work on the STEMulator platform. You must be encouraging but honest. Evaluate the quality and scientific accuracy of their setup, observations, evidence and predictions.
 
 You MUST respond with ONLY valid JSON (no markdown fences, no extra text) in this exact schema:
 {
   "overallScore": <number 0-100>,
-  "feedback": "<2-3 sentence overall assessment>",
-  "strengths": ["<strength 1>", "<strength 2>"],
-  "areasForImprovement": ["<area 1>", "<area 2>"],
-  "guidance": "<1-2 sentence next step recommendation>"
+  "feedback": "<2-4 sentence overall assessment>",
+  "strengths": ["<strength 1>", "<strength 2>", "<strength 3 (optional)>"],
+  "areasForImprovement": ["<area 1>", "<area 2>", "<area 3 (optional)>"],
+  "guidance": "<2-4 sentence next steps recommendation>"
 }`,
   };
 
@@ -264,35 +291,8 @@ ${studentAnswers}
 Evaluate the student's responses for scientific accuracy, depth, and completeness. Return ONLY the JSON object.`,
   };
 
-  const raw = await callChat([system, user]);
+  const evalResult = await getStudentEval([system,user]);
+  console.log("evalResult response from AI Coach:", evalResult);
+  return evalResult;
 
-  // Parse the JSON response (handle markdown code fences if present)
-  const cleaned = raw
-    .replace(/```json?\n?/g, "")
-    .replace(/```/g, "")
-    .trim();
-
-  try {
-    const parsed = JSON.parse(cleaned) as EvalResult;
-    // Clamp score
-    parsed.overallScore = Math.max(0, Math.min(100, parsed.overallScore));
-    return parsed;
-  } catch {
-    // Guard against surfacing a raw API error string as student-facing feedback.
-    // Only use the raw text if it looks like genuine prose content.
-    const looksLikeContent =
-      raw.length > 20 &&
-      !raw.toLowerCase().startsWith("ai coach") &&
-      !raw.toLowerCase().startsWith("error") &&
-      !raw.includes('{"error"');
-    return {
-      overallScore: 70,
-      feedback: looksLikeContent
-        ? raw
-        : "Your responses have been recorded. Review the guidance below to strengthen your answers.",
-      strengths: ["Engagement with the simulation"],
-      areasForImprovement: ["Try to be more specific in your observations"],
-      guidance: "Continue exploring different simulation parameters.",
-    };
-  }
 }
