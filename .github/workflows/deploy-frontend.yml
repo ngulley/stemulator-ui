@@ -1,0 +1,52 @@
+name: Build and Deploy UI to S3 + CloudFront
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-2
+      S3_BUCKET: stemulator1-794934875782-us-east-2-an
+      CLOUDFRONT_DISTRIBUTION_ID: E1LSXU11ARDZOB
+      VITE_API_URL: https://api.stemulator.us/stemulator/v1
+      VITE_GOOGLE_CLIENT_ID: 207246199976-6459q0c09qgbuph8lfvetkvobnhnm6kt.apps.googleusercontent.com
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+
+      - name: Upload build to S3
+        run: aws s3 sync dist/ s3://${S3_BUCKET} --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${CLOUDFRONT_DISTRIBUTION_ID}" \
+            --paths "/*"
