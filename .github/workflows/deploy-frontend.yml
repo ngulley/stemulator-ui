@@ -15,7 +15,7 @@ jobs:
 
     env:
       AWS_REGION: us-east-2
-      S3_BUCKET: stemulator1-794934875782-us-east-2-an
+      S3_BUCKET: stemulator1
       CLOUDFRONT_DISTRIBUTION_ID: E1LSXU11ARDZOB
       VITE_API_URL: https://api.stemulator.us/stemulator/v1
       VITE_GOOGLE_CLIENT_ID: 207246199976-6459q0c09qgbuph8lfvetkvobnhnm6kt.apps.googleusercontent.com
@@ -41,6 +41,12 @@ jobs:
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+
+      - name: Show AWS identity
+        run: aws sts get-caller-identity
+
+      - name: List buckets
+        run: aws s3 ls
 
       - name: Upload build to S3
         run: aws s3 sync dist/ s3://${S3_BUCKET} --delete
