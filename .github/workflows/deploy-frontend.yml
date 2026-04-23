@@ -45,8 +45,8 @@ jobs:
       - name: Show AWS identity
         run: aws sts get-caller-identity
 
-      - name: List buckets
-        run: aws s3 ls
+      - name: Check target bucket
+        run: aws s3 ls s3://${S3_BUCKET}
 
       - name: Upload build to S3
         run: aws s3 sync dist/ s3://${S3_BUCKET} --delete
