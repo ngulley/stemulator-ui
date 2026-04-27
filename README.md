@@ -22,6 +22,7 @@ An AI-guided virtual STEM lab platform with interactive courses and real-time Na
 - [Environment Variables](#environment-variables)
 - [Available Scripts](#available-scripts)
 - [Testing](#testing)
+- [Production Deployment](#production-deployment)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -369,7 +370,7 @@ Sessions survive page refresh (stored in `localStorage` under `stemulator_sessio
 ### Endpoints Used
 
 | Method | Endpoint                          | Used By         | Purpose                                                                   |
-| ------ |-----------------------------------| --------------- |---------------------------------------------------------------------------|
+| ------ | --------------------------------- | --------------- | ------------------------------------------------------------------------- |
 | `GET`  | `/stemulator/v1/labs`             | Labs page       | Fetch all labs                                                            |
 | `GET`  | `/stemulator/v1/labs/{labId}`     | Lab Detail page | Fetch single lab                                                          |
 | `POST` | `/stemulator/v1/student_eval`     | AI Coach        | Evaluates the student's lab setup, observations, evidence and predictions |
@@ -546,6 +547,136 @@ npm run test:coverage
 | `src/components/AIPanel.tsx`          | —                                                                                                 | Error bubble on failed chat                        |
 | `src/pages/Labs.tsx`                  | —                                                                                                 | Offline banner on `getLabs` failure                |
 | `src/pages/LabDetail.tsx`             | —                                                                                                 | Lab loading, part navigation                       |
+
+---
+
+## Production Deployment
+
+STEMulator runs on AWS. Both the UI and API are deployed automatically on every push to `main` via GitHub Actions.
+
+### Topology
+
+```
+                              ┌────────────────────────┐
+   stemulator.us  ───DNS──▶   │   AWS CloudFront (CDN) │
+                              └──────────┬─────────────┘
+                                         │ origin
+                                         ▼
+                              ┌────────────────────────┐
+                              │   S3 bucket: stemulator1│  ◀── UI build artifacts (dist/)
+                              └────────────────────────┘
+
+                              ┌────────────────────────┐
+   api.stemulator.us  ──DNS─▶ │   AWS ALB (HTTPS)      │
+                              └──────────┬─────────────┘
+                                         │ :8080
+                                         ▼
+                              ┌────────────────────────┐
+                              │   EC2 (Ubuntu, Java 21)│  ◀── stemulator-api.jar (systemd)
+                              └──────────┬─────────────┘
+                                         │
+                                         ▼
+                              ┌────────────────────────┐
+                              │   MongoDB (lab data)   │
+                              └────────────────────────┘
+```
+
+### Frontend Deployment
+
+Workflow: [.github/workflows/deploy-frontend.yml](.github/workflows/deploy-frontend.yml)
+
+Pipeline on every push to `main`:
+
+1. Checkout, install dependencies (`npm ci`).
+2. `npm run build` produces `dist/`.
+3. Assume AWS role via OIDC (no static credentials).
+4. `aws s3 sync dist/ s3://stemulator1 --delete`.
+5. Create CloudFront invalidation `/*` so users see the new build immediately.
+
+**Required GitHub Actions secrets:**
+
+| Secret                        | Purpose                                            |
+| ----------------------------- | -------------------------------------------------- |
+| `AWS_GITHUB_ACTIONS_ROLE_ARN` | IAM role assumed by Actions via OIDC for S3 + CFN. |
+
+**Required GitHub Actions env (declared in workflow):**
+
+| Variable                     | Value                                     |
+| ---------------------------- | ----------------------------------------- |
+| `AWS_REGION`                 | `us-east-2`                               |
+| `S3_BUCKET`                  | `stemulator1`                             |
+| `CLOUDFRONT_DISTRIBUTION_ID` | `E1LSXU11ARDZOB`                          |
+| `VITE_API_URL`               | `https://api.stemulator.us/stemulator/v1` |
+| `VITE_GOOGLE_CLIENT_ID`      | Google OAuth client ID                    |
+
+### Backend Deployment
+
+Workflow: [stemulator-api/.github/workflows/deploy-backend.yml](stemulator-api/.github/workflows/deploy-backend.yml)
+
+Pipeline on every push to `main`:
+
+1. Checkout, set up Java 21 (Temurin) with Maven cache.
+2. `mvn -B clean package -DskipTests` produces `target/stemulator-api-*.jar`.
+3. Add EC2 SSH private key from secret to ssh-agent.
+4. `ssh-keyscan` the host, then `scp` the JAR to `/opt/stemulator-api/stemulator-api.jar`.
+5. `ssh` and run `sudo systemctl restart stemulator-api` to swap in the new version.
+
+**Required GitHub Actions secrets:**
+
+| Secret                | Purpose                                        |
+| --------------------- | ---------------------------------------------- |
+| `EC2_SSH_PRIVATE_KEY` | SSH key for the `ubuntu` user on the EC2 host. |
+
+The Spring Boot app is supervised by `systemd` (`stemulator-api.service`) which auto-restarts the JVM if the process exits.
+
+### Rollback Procedure
+
+#### Frontend rollback (S3 + CloudFront)
+
+The S3 bucket has versioning enabled (recommended; verify in the S3 console). To roll back the UI to a previous deploy:
+
+```bash
+# 1. Identify the previous good build by looking at S3 object versions
+aws s3api list-object-versions --bucket stemulator1 --prefix index.html
+
+# 2. Restore prior versions of all objects in the bucket
+#    (or, simpler: re-run the deploy workflow against an earlier commit)
+git checkout <previous-good-sha>
+git push origin HEAD:main --force-with-lease   # only if absolutely necessary
+
+# 3. Force CloudFront to drop its cached copy
+aws cloudfront create-invalidation \
+    --distribution-id E1LSXU11ARDZOB --paths "/*"
+```
+
+The preferred path is **re-deploying** the prior good commit through the same Actions workflow rather than mutating S3 directly — the workflow is the only path that should touch production.
+
+#### Backend rollback (EC2)
+
+Each deploy overwrites `/opt/stemulator-api/stemulator-api.jar`. Before swapping, the prior JAR is kept by the workflow only as long as the SCP step runs; for true rollback we rely on **redeploy of the previous git SHA**:
+
+```bash
+# Re-run the Actions workflow against the last known-good commit:
+gh workflow run deploy-backend.yml --ref <previous-good-sha>
+```
+
+If the API is hard-down and Actions is unavailable, an operator can SSH in and restart manually:
+
+```bash
+ssh ubuntu@ec2-3-145-201-181.us-east-2.compute.amazonaws.com
+sudo systemctl restart stemulator-api
+sudo journalctl -u stemulator-api -f       # tail logs to verify startup
+```
+
+### Health Verification After Deploy
+
+| Check                  | Command / URL                                                        |
+| ---------------------- | -------------------------------------------------------------------- |
+| UI live                | `curl -I https://stemulator.us` (expect `200`)                       |
+| API reachable          | `curl https://api.stemulator.us/stemulator/v1/labs` (expect JSON)    |
+| Backend service status | `sudo systemctl status stemulator-api` on the EC2 host               |
+| Backend logs           | `sudo journalctl -u stemulator-api -n 100 --no-pager`                |
+| Client-side health     | Browser console — `logger` warnings + circuit-breaker state messages |
 
 ---
 
